@@ -140,12 +140,13 @@ impl Decrypter {
         let mut data: Vec<u8> = file_content.to_vec();
         self.process_buffer(&mut data);
 
-        [
+        const HEADER: [u8; 16] = [
             0x52, 0x50, 0x47, 0x4d, 0x56, 0x00, 0x00, 0x00, 0x00, 0x03, 0x01, 0x00, 0x00, 0x00,
             0x00, 0x00,
-        ]
-        .into_iter()
-        .chain(data)
-        .collect()
+        ];
+
+        let mut output_data = Vec::from(HEADER);
+        output_data.extend(data);
+        output_data
     }
 }
