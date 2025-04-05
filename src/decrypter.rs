@@ -10,8 +10,8 @@ impl Decrypter {
     /// # Arguments
     ///
     /// - `key` - Optional encryption key, that can be fetched from `System.json`'s `encryptionKey` field.
-    ///           Leave it `None` to auto-determine the key from input files. You can set it after
-    ///           constructing `Decrypter` using `set_key_from_image()` or `set_key_string()`.
+    ///   Leave it `None` to auto-determine the key from input files. You can set it after
+    ///   constructing `Decrypter` using `set_key_from_image()` or `set_key_string()`.
     pub fn new(key: Option<String>) -> Self {
         let mut decrypter: Decrypter = Decrypter {
             key,
