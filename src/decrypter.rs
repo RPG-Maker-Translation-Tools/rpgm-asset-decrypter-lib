@@ -26,6 +26,7 @@ impl Decrypter {
         decrypter
     }
 
+    #[inline]
     fn split_encryption_code(&self) -> Vec<u8> {
         match &self.key {
             None => Vec::new(),
@@ -47,6 +48,7 @@ impl Decrypter {
         }
     }
 
+    #[inline]
     fn process_buffer(&self, buffer: &mut [u8]) {
         let limit: usize = self.header_length.min(self.key_array.len());
 
@@ -58,6 +60,7 @@ impl Decrypter {
     /// Returns the decrypter's key.
     ///
     /// Falls back to empty string if key is not set.
+    #[inline]
     pub fn key(&self) -> String {
         if let Some(ref key) = self.key {
             key.to_owned()
@@ -71,6 +74,7 @@ impl Decrypter {
     /// # Arguments
     ///
     /// - `key` - The encryption key string.
+    #[inline]
     pub fn set_key_string(&mut self, key: String) {
         self.key = Some(key);
         self.key_array = self.split_encryption_code();
@@ -81,6 +85,7 @@ impl Decrypter {
     /// # Arguments
     ///
     /// - `file_content` - The data of RPG Maker file
+    #[inline]
     pub fn set_key_from_image(&mut self, file_content: &[u8]) {
         let header: &[u8] = &file_content[self.header_length..self.header_length * 2];
         const PNG_HEADER: [u8; 16] = [
@@ -106,6 +111,7 @@ impl Decrypter {
     /// # Returns
     ///
     /// - Vector containing decrypted data.
+    #[inline]
     pub fn decrypt(&mut self, file_content: &[u8]) -> Vec<u8> {
         if self.key.is_none() {
             self.set_key_from_image(file_content);
@@ -132,6 +138,7 @@ impl Decrypter {
     /// # Panics
     ///
     /// - Panics if encryption key is not set.
+    #[inline]
     pub fn encrypt(&self, file_content: &[u8]) -> Vec<u8> {
         if self.key.is_none() {
             panic!("Encryption key is not set.");
@@ -145,7 +152,8 @@ impl Decrypter {
             0x00, 0x00,
         ];
 
-        let mut output_data = Vec::from(HEADER);
+        let mut output_data: Vec<u8> = Vec::with_capacity(HEADER.len() + data.len());
+        output_data.extend(HEADER);
         output_data.extend(data);
         output_data
     }
