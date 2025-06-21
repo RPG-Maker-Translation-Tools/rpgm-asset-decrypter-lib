@@ -2,7 +2,7 @@
 
 A library for decrypting/encrypting RPG Maker MV/MZ audio and image assets.
 
-Used in my [rpgm-asset-decrypter-rs](https://github.com/savannstm/rpgm-asset-decrypter-rs) CLI tool.
+Used in [rpgm-asset-decrypter-rs](https://github.com/savannstm/rpgm-asset-decrypter-rs) CLI tool.
 
 ## Installation
 
@@ -16,12 +16,12 @@ Decrypt:
 use rpgm_asset_decrypter_lib::Decrypter;
 use std::fs::{read, write};
 
-let mut decrypter = Decrypter::new(None);
+let mut decrypter = Decrypter::new();
 let file = "./picture.rpgmvp";
 let buf = read(file).unwrap();
 
 // For images, decrypter automatically determines the key.
-// For audio, read `encryptionKey` property from `System.json` and pass it to `Decrypter` constructor.
+// For audio, read `encryptionKey` property from `System.json` and pass it to `Decrypter::set_key_from_str` function.
 let decrypted = decrypter.decrypt(&buf);
 write("./decrypted-pitcure.png", decrypted).unwrap();
 ```
@@ -29,16 +29,20 @@ write("./decrypted-pitcure.png", decrypted).unwrap();
 Encrypt:
 
 ```rust
-use rpgm_asset_decrypter_lib::Decrypter;
+use rpgm_asset_decrypter_lib::{Decrypter, DEFAULT_KEY};
 use std::fs::{read, write};
 
 // When encrypting, decrypter requires a key.
 // It can be read from `encryptionKey` property in `System.json`.
-let decrypter = Decrypter::new(Some(String::from("d41d8cd98f00b204e9800998ecf8427e")));
+let mut decrypter = Decrypter::new();
+
+// The library provides default key, which most games use by default.
+// It might not work for every game, so if you get bad output, grab the right one from `System.json`.
+decrypter.set_key_from_str(DEFAULT_KEY).unwrap();
 let file = "./picture.png";
 let buf = read(file).unwrap();
 
-let encrypted = decrypter.encrypt(&buf);
+let encrypted = decrypter.encrypt(&buf).unwrap();
 write("./decrypted-pitcure.rpgmvp", encrypted).unwrap();
 ```
 
