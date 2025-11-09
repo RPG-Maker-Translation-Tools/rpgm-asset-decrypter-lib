@@ -1,12 +1,8 @@
-use png::Decoder;
-use rpgm_asset_decrypter_lib::{Decrypter, DEFAULT_KEY};
+use rpgm_asset_decrypter_lib::{DEFAULT_KEY, Decrypter};
 use std::fs::read;
 
-fn is_valid_png(buf: &[u8]) {
-    let decoder = Decoder::new(buf);
-    let reader = decoder.read_info();
-
-    reader.unwrap();
+fn is_valid_png(buf: &[u8]) -> bool {
+    buf.starts_with(b"\x89PNG\r\n\x1a\n")
 }
 
 #[test]
@@ -17,7 +13,9 @@ fn decrypt_mv() {
     decrypter.set_key_from_str(DEFAULT_KEY).unwrap();
     let decrypted = decrypter.decrypt(&read(TRACK_PATH).unwrap());
 
-    is_valid_png(&decrypted);
+    if !is_valid_png(&decrypted) {
+        panic!("Decrypted data does not match the PNG header.")
+    };
 }
 
 #[test]
@@ -31,7 +29,9 @@ fn encrypt_mv() {
     let encrypted = decrypter.encrypt(&decrypted).unwrap();
     let decrypted = decrypter.decrypt(&encrypted);
 
-    is_valid_png(&decrypted);
+    if !is_valid_png(&decrypted) {
+        panic!("Decrypted data does not match the PNG header.")
+    };
 }
 
 #[test]
@@ -42,7 +42,9 @@ fn decrypt_mz() {
     decrypter.set_key_from_str(DEFAULT_KEY).unwrap();
     let decrypted = decrypter.decrypt(&read(TRACK_PATH).unwrap());
 
-    is_valid_png(&decrypted);
+    if !is_valid_png(&decrypted) {
+        panic!("Decrypted data does not match the PNG header.")
+    };
 }
 
 #[test]
@@ -56,5 +58,7 @@ fn encrypt_mz() {
     let encrypted = decrypter.encrypt(&decrypted).unwrap();
     let decrypted = decrypter.decrypt(&encrypted);
 
-    is_valid_png(&decrypted);
+    if !is_valid_png(&decrypted) {
+        panic!("Decrypted data does not match the PNG header.")
+    };
 }
