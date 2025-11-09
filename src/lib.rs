@@ -149,14 +149,17 @@ impl Decrypter {
         let header = &file_content[HEADER_LENGTH..HEADER_LENGTH * 2];
         let mut key_hex = [0; KEY_LENGTH];
 
-        for i in (0..HEADER_LENGTH).step_by(2) {
+        let mut j = 0;
+
+        for i in 0..HEADER_LENGTH {
             let value = PNG_HEADER[i] ^ header[i];
 
             let high = HEX_CHARS[(value >> 4) as usize];
             let low = HEX_CHARS[(value & 0x0F) as usize];
 
-            key_hex[i] = high;
-            key_hex[i + 1] = low;
+            key_hex[j] = high;
+            key_hex[j + 1] = low;
+            j += 2;
         }
 
         let key_string = unsafe { std::str::from_utf8_unchecked(&key_hex) };
