@@ -10,7 +10,7 @@
 
 **BLAZINGLY** :fire: fast and tiny library for decrypting RPG Maker MV/MZ `rpgmvp`/`png_`, `rpgmvo`/`ogg_`, `rpgmvm`/`m4a_` assets.
 
-This project essentially is a rewrite of Petschko's [RPG-Maker-MV-Decrypter](https://gitlab.com/Petschko/RPG-Maker-MV-Decrypter) in Rust, but it also implements encryption key extraction from non-image files, such as `rpgmvo`/`ogg_` and `rpgmvm`/`m4a_`.
+This project essentially is a rewrite of Petschko's [RPG-Maker-MV-Decrypter](https://gitlab.com/Petschko/RPG-Maker-MV-Decrypter) in Rust, but it also implements encryption key extraction from non-image files, such as `rpgmvo`/`ogg_` (with `vorbis-key-extraction` feature) and `rpgmvm`/`m4a_`.
 
 And since it's implemented in Rust 🦀🦀🦀, it's also very tiny, clean, and performant.
 
@@ -90,13 +90,22 @@ let encrypted = decrypter.encrypt(&buf).unwrap();
 write("./encrypted-picture.rpgmvp", encrypted).unwrap();
 ```
 
+## Features
+
+- `serde` - enables serde serialization/deserialization for `Error` type.
+- `vorbis-key-extraction` - enables key auto-extraction from `rpgmvo`/`ogg_` OGG files. This is made as a feature because it depends on `vorbis-rs` which pulls a handful of libraries.
+
 ## License
 
 Project is licensed under WTFPL.
 */
 
 use std::ffi::OsStr;
+#[cfg(feature = "vorbis-key-extraction")]
+use std::io::Cursor;
 use thiserror::Error;
+#[cfg(feature = "vorbis-key-extraction")]
+use vorbis_rs::VorbisDecoder;
 
 const HEX_CHARS: &[u8; 16] = b"0123456789abcdef";
 
@@ -108,15 +117,32 @@ pub const KEY_STR_LENGTH: usize = 32;
 // Key used in RPG Maker encrypted files when "Encryption key" is left unfilled.
 pub const DEFAULT_KEY: &str = "d41d8cd98f00b204e9800998ecf8427e";
 
-// Reverse-engineered signatures, upon which keys are bitwise xor'd.
-const RPGM_PNG_SIGNATURE: [u8; HEADER_LENGTH] = [
+// RPG Maker's encoding is essentially taking source file's header (16 bytes) and xor'ing it upon a MD5 key produced from encryption key string. Most projects leave encryption key string empty, so resulting 'encryption' is just header xor'd with default MD5 key.
+
+// For PNG, header is always the same, so we can expect valid decryption.
+const PNG_HEADER: [u8; HEADER_LENGTH] = [
     0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
     0x49, 0x48, 0x44, 0x52,
 ];
-const RPGM_OGG_SIGNATURE: [u8; HEADER_LENGTH] =
-    [79, 103, 103, 83, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 44, 10];
-const RPGM_M4A_SIGNATURE: [u8; HEADER_LENGTH] =
+
+// 0 - 3 - OggS
+// 4 - version, always 0
+// 5 - header type, always 0x02, since first page always announces the beginning of the stream
+// 6 - 13 - granule position, always 0, since first page has no actual data
+//* 14 - 15 - part of 4-byte bitstream serial number, that actually differs between files
+const OGG_HEADER: [u8; HEADER_LENGTH] =
+    [79, 103, 103, 83, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+
+//* 0 - 3 - type box size, actually differs between files
+// 4 - 7 - ftyp, always the same
+// 8 - 11 - M4A_, always the same, may be different 4 characters, but extremely unlikely
+// 12 - 15 - minor version, mostly junk, doesn't matter
+static mut M4A_HEADER: [u8; HEADER_LENGTH] =
     [0, 0, 0, 28, 102, 116, 121, 112, 77, 52, 65, 32, 0, 0, 2, 0];
+
+// For finding type box size
+const M4A_POST_HEADER_BOXES: &[&[u8]] =
+    &[b"moov", b"mdat", b"free", b"skip", b"wide", b"pnot"];
 
 // Every encrypted file includes this header.
 pub const RPGM_HEADER: [u8; HEADER_LENGTH] = [
@@ -124,7 +150,7 @@ pub const RPGM_HEADER: [u8; HEADER_LENGTH] = [
     0x00, 0x00, 0x00, 0x00,
 ];
 
-#[derive(Clone, Copy)]
+#[derive(PartialEq, Clone, Copy)]
 #[repr(u8)]
 pub enum FileType {
     PNG,
@@ -175,6 +201,10 @@ pub enum Error {
         "Unexpected end of file encountered. Either passed data is not RPG Maker data or it's corrupted."
     )]
     UnexpectedEOF,
+    #[error(
+        "Vorbis (`rpgmvo`/`ogg_`) key extraction is not supported, since `vorbis-key-extraction` feature is disabled. If you're a developer, enable this feature or indicate users that they need to extract the key from a different file."
+    )]
+    VorbisKeyExtractionUnsupported,
 }
 
 #[derive(Default)]
@@ -266,12 +296,18 @@ impl Decrypter {
     ///
     /// - [`Error::InvalidHeader`] - if passed `file_content` data contains invalid header.
     /// - [`Error::UnexpectedEOF`] - if passed `file_content` data ends unexpectedly.
+    /// - [`Error::VorbisKeyExtractionUnsupported`] - if passed `file_type` is [`FileType::OGG`] and `vorbis-key-extraction` feature is disabled.
     #[inline]
     pub fn set_key_from_file(
         &mut self,
         file_content: &[u8],
         file_type: FileType,
     ) -> Result<&str, Error> {
+        #[cfg(not(feature = "vorbis-key-extraction"))]
+        if file_type == FileType::OGG {
+            return Err(Error::VorbisKeyExtractionUnsupported);
+        }
+
         if !file_content.starts_with(&RPGM_HEADER) {
             return Err(Error::InvalidHeader);
         }
@@ -282,13 +318,31 @@ impl Decrypter {
             return Err(Error::UnexpectedEOF);
         };
 
-        let mut j = 0;
+        // Get proper M4A header box size
+        //* We don't care about anything else for M4A, since `ftypM4A_` in M4A header can be easily replaced by `ftypSHIT`, and FFmpeg will have ZERO complains.
+        //* The same goes for 12-15 bytes (inclusive), they can be overwritten with whatever integer.
+        if file_type == FileType::M4A {
+            let header_64_bytes =
+                &file_content[HEADER_LENGTH..HEADER_LENGTH + 64];
+            let header_chunks = header_64_bytes.chunks_exact(4);
 
+            for (i, chunk) in header_chunks.enumerate() {
+                if M4A_POST_HEADER_BOXES.contains(&chunk) {
+                    unsafe {
+                        M4A_HEADER[..4].copy_from_slice(
+                            &(((i - 1) * 4) as u32).to_le_bytes(),
+                        );
+                    }
+                }
+            }
+        }
+
+        let mut j = 0;
         for i in 0..HEADER_LENGTH {
             let signature_byte = match file_type {
-                FileType::PNG => RPGM_PNG_SIGNATURE[i],
-                FileType::OGG => RPGM_OGG_SIGNATURE[i],
-                FileType::M4A => RPGM_M4A_SIGNATURE[i],
+                FileType::PNG => PNG_HEADER[i],
+                FileType::OGG => OGG_HEADER[i],
+                FileType::M4A => unsafe { M4A_HEADER[i] },
             };
 
             let value = signature_byte ^ post_header[i];
@@ -301,9 +355,52 @@ impl Decrypter {
             j += 2;
         }
 
-        self.set_key_from_hex();
+        #[cfg(feature = "vorbis-key-extraction")]
+        if file_type != FileType::OGG
+            || VorbisDecoder::new(Cursor::new(&file_content[HEADER_LENGTH..]))
+                .is_ok()
+        {
+            self.set_key_from_hex();
+            return Ok(unsafe { std::str::from_utf8_unchecked(&self.key_hex) });
+        }
 
-        Ok(unsafe { std::str::from_utf8_unchecked(&self.key_hex) })
+        #[cfg(not(feature = "vorbis-key-extraction"))]
+        {
+            self.set_key_from_hex();
+            Ok(unsafe { std::str::from_utf8_unchecked(&self.key_hex) })
+        }
+
+        #[cfg(feature = "vorbis-key-extraction")]
+        // Brute-forcing 14-15th OGG header bytes
+        {
+            let mut candidate = file_content[HEADER_LENGTH..].to_vec();
+            let mut candidate_backup: [u8; 16] = Default::default();
+            candidate_backup[..16].copy_from_slice(&candidate[..16]);
+
+            for b15 in 0..=u8::MAX {
+                for b16 in 0..=u8::MAX {
+                    candidate[..16].copy_from_slice(&candidate_backup[..16]);
+
+                    self.key_hex[28] = HEX_CHARS[(b15 >> 4) as usize];
+                    self.key_hex[29] = HEX_CHARS[(b15 & 0x0F) as usize];
+                    self.key_hex[30] = HEX_CHARS[(b16 >> 4) as usize];
+                    self.key_hex[31] = HEX_CHARS[(b16 & 0x0F) as usize];
+
+                    self.set_key_from_hex();
+                    self.xor_buffer(&mut candidate);
+
+                    if VorbisDecoder::new(Cursor::new(&candidate)).is_ok() {
+                        return Ok(unsafe {
+                            std::str::from_utf8_unchecked(&self.key_hex)
+                        });
+                    }
+                }
+            }
+
+            unreachable!(
+                "We should've handled OGG files, but something has gone wrong."
+            );
+        }
     }
 
     /// Decrypts RPG Maker file content.
