@@ -1,9 +1,9 @@
 [package]
 name = "rpgm-asset-decrypter-lib"
-version = "2.1.1"
+version = "3.0.0"
 authors = ["savannstm <savannstm@gmail.com>"]
 edition = "2018"
-rust-version = "1.56.0"
+rust-version = "1.68.0"
 description = "A library for decrypting/encrypting RPG Maker MV/MZ audio and image assets."
 documentation = "https://docs.rs/rpgm-asset-decrypter-lib"
 readme = "README.md"
@@ -12,7 +12,7 @@ license-file = "LICENSE.md"
 
 [dependencies]
 serde = { version = "1.0.228", optional = true }
-thiserror = "1.0.65"
+thiserror = "2.0.17"
 
 [features]
 serde = ["dep:serde"]
