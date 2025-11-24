@@ -2,7 +2,7 @@
 
 **BLAZINGLY** :fire: fast and tiny library for decrypting RPG Maker MV/MZ `rpgmvp`/`png_`, `rpgmvo`/`ogg_`, `rpgmvm`/`m4a_` assets.
 
-This project essentially is a rewrite of Petschko's [RPG-Maker-MV-Decrypter](https://gitlab.com/Petschko/RPG-Maker-MV-Decrypter) in Rust, but it also implements encryption key extraction from non-image files, such as `rpgmvo`/`ogg_` (with `vorbis-key-extraction` feature) and `rpgmvm`/`m4a_`.
+This project essentially is a rewrite of Petschko's [RPG-Maker-MV-Decrypter](https://gitlab.com/Petschko/RPG-Maker-MV-Decrypter) in Rust, but it also implements encryption key extraction from non-image files, such as `rpgmvo`/`ogg_` and `rpgmvm`/`m4a_`.
 
 And since it's implemented in Rust 🦀🦀🦀, it's also very tiny, clean, and performant.
 
@@ -85,7 +85,6 @@ write("./encrypted-picture.rpgmvp", encrypted).unwrap();
 ## Features
 
 -   `serde` - enables serde serialization/deserialization for `Error` type.
--   `vorbis-key-extraction` - enables key auto-extraction from `rpgmvo`/`ogg_` OGG files. This is made as a feature because it depends on `vorbis-rs` which pulls a handful of libraries.
 
 ## License
 
