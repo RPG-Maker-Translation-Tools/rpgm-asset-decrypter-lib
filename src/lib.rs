@@ -124,7 +124,7 @@ pub const DEFAULT_KEY: &str = "d41d8cd98f00b204e9800998ecf8427e";
 // RPG Maker's encoding is essentially taking source file's header (16 bytes) and xor'ing it upon a MD5 key produced from encryption key string. Most projects leave encryption key string empty, so resulting 'encryption' is just header xor'd with default MD5 key.
 
 // For PNG, header is always the same, so we can expect valid decryption.
-const PNG_HEADER: [u8; HEADER_LENGTH] = [
+const PNG_HEADER: &[u8] = &[
     0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
     0x49, 0x48, 0x44, 0x52,
 ];
@@ -149,7 +149,7 @@ const M4A_POST_HEADER_BOXES: &[&[u8]] =
     &[b"moov", b"mdat", b"free", b"skip", b"wide", b"pnot"];
 
 // Every encrypted file includes this header.
-pub const RPGM_HEADER: [u8; HEADER_LENGTH] = [
+pub const RPGM_HEADER: &[u8] = &[
     0x52, 0x50, 0x47, 0x4d, 0x56, 0x00, 0x00, 0x00, 0x00, 0x03, 0x01, 0x00,
     0x00, 0x00, 0x00, 0x00,
 ];
@@ -386,7 +386,7 @@ impl Decrypter {
         file_content: &[u8],
         file_type: FileType,
     ) -> Result<&str, Error> {
-        if !file_content.starts_with(&RPGM_HEADER) {
+        if !file_content.starts_with(RPGM_HEADER) {
             return Err(Error::InvalidHeader);
         }
 
@@ -490,7 +490,7 @@ impl Decrypter {
         file_content: &[u8],
         file_type: FileType,
     ) -> Result<Vec<u8>, Error> {
-        if !file_content.starts_with(&RPGM_HEADER) {
+        if !file_content.starts_with(RPGM_HEADER) {
             return Err(Error::InvalidHeader);
         }
 
@@ -533,7 +533,7 @@ impl Decrypter {
         file_content: &'a mut [u8],
         file_type: FileType,
     ) -> Result<&'a [u8], Error> {
-        if !file_content.starts_with(&RPGM_HEADER) {
+        if !file_content.starts_with(RPGM_HEADER) {
             return Err(Error::InvalidHeader);
         }
 

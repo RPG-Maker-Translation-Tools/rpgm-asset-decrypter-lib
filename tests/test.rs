@@ -135,7 +135,7 @@ fn run_encrypt_in_place_roundtrip(case: &TestCase) {
     let mut buf = clean.clone();
 
     d.encrypt_in_place(&mut buf).unwrap();
-    buf.splice(0..0, RPGM_HEADER);
+    buf.splice(0..0, RPGM_HEADER.to_owned());
 
     let decrypted = d.decrypt(&buf, case.file_type).unwrap();
     assert!((case.validator)(&decrypted));
