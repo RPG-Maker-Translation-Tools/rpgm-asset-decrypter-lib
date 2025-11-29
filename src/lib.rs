@@ -102,9 +102,10 @@ Project is licensed under WTFPL.
 use std::{
     convert::TryFrom,
     ffi::OsStr,
+    fmt::Display,
     io::{Cursor, Read, Seek, SeekFrom},
 };
-use strum_macros::{Display, EnumIs};
+use strum_macros::Display;
 use thiserror::Error;
 
 const HEX_CHARS: &[u8; 16] = b"0123456789abcdef";
@@ -166,15 +167,39 @@ pub const ENCRYPTED_ASSET_EXTS: &[&str] = &[
 ];
 pub const DECRYPTED_ASSETS_EXTS: &[&str] = &[PNG_EXT, OGG_EXT, M4A_EXT];
 
-#[derive(PartialEq, Clone, Copy, EnumIs, Display)]
+#[derive(PartialEq, Clone, Copy)]
 #[repr(u8)]
 pub enum FileType {
-    #[strum(to_string = "png")]
     PNG,
-    #[strum(to_string = "ogg")]
     OGG,
-    #[strum(to_string = "m4a")]
     M4A,
+}
+
+impl FileType {
+    #[must_use]
+    pub fn is_png(self) -> bool {
+        matches!(self, Self::PNG)
+    }
+
+    #[must_use]
+    pub fn is_ogg(self) -> bool {
+        matches!(self, Self::OGG)
+    }
+
+    #[must_use]
+    pub fn is_m4a(self) -> bool {
+        matches!(self, Self::M4A)
+    }
+}
+
+impl Display for FileType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::PNG => f.write_str("png"),
+            Self::OGG => f.write_str("ogg"),
+            Self::M4A => f.write_str("m4a"),
+        }
+    }
 }
 
 impl TryFrom<&str> for FileType {
