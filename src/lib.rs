@@ -105,8 +105,11 @@ use std::{
     fmt::Display,
     io::{Cursor, Read, Seek, SeekFrom},
 };
-use strum_macros::Display;
 use thiserror::Error;
+
+macro_rules! sizeof {
+    ($t:ty) => {{ size_of::<$t>() }};
+}
 
 const HEX_CHARS: &[u8; 16] = b"0123456789abcdef";
 
@@ -293,7 +296,10 @@ impl Decrypter {
     }
 
     fn read_ogg_page_serialno(file_content: &mut Cursor<&[u8]>) -> u32 {
-        let mut header: [u8; 27] = [0; 27];
+        const HEADER_SIZE: usize = 27;
+        const SERIALNO_POS: usize = 14;
+
+        let mut header: [u8; HEADER_SIZE] = [0; HEADER_SIZE];
 
         file_content.read_exact(&mut header).unwrap();
 
@@ -314,8 +320,11 @@ impl Decrypter {
 
         file_content.seek(SeekFrom::Current(body_length)).unwrap();
 
-        let header_serialno =
-            unsafe { *header[14..18].as_ptr().cast::<[u8; 4]>() };
+        let header_serialno = unsafe {
+            *header[SERIALNO_POS..SERIALNO_POS + sizeof!(u32)]
+                .as_ptr()
+                .cast::<[u8; sizeof!(u32)]>()
+        };
 
         u32::from(header_serialno[0])
             | (u32::from(header_serialno[1]) << 8)
@@ -390,8 +399,8 @@ impl Decrypter {
         // Get proper M4A header box size
         //* We don't care about anything else for M4A, since `ftypM4A_` in M4A header can be easily replaced by `ftypSHIT`, and FFmpeg will have ZERO complains.
         //* The same goes for 12-15 bytes (inclusive), they can be overwritten with whatever integer.
-        if file_type == FileType::M4A {
-            const CHUNK_SIZE: usize = 4;
+        if file_type.is_m4a() {
+            const CHUNK_SIZE: usize = sizeof!(u32);
 
             let Some(file_start) =
                 file_content.get(HEADER_LENGTH..HEADER_LENGTH + 64)
@@ -418,7 +427,7 @@ impl Decrypter {
 
         // Since stream serial number is incorrect in OGG_HEADER because it's different for each file, we need to seek to the second page of the stream and grab the serial number from there, and then replace it in the header.
         // Serial number is persistent across all pages of the stream, so we can gan grab it from the second page and replace in the first.
-        if file_type == FileType::OGG {
+        if file_type.is_ogg() {
             let mut file_content_cursor =
                 Cursor::new(&file_content[HEADER_LENGTH..]);
 
