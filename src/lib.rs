@@ -150,6 +150,22 @@ pub const RPGM_HEADER: [u8; HEADER_LENGTH] = [
     0x00, 0x00, 0x00, 0x00,
 ];
 
+pub const MV_PNG_EXT: &str = "rpgmvp";
+pub const MZ_PNG_EXT: &str = "png_";
+pub const MV_OGG_EXT: &str = "rpgmvo";
+pub const MZ_OGG_EXT: &str = "ogg_";
+pub const MV_M4A_EXT: &str = "rpgmvm";
+pub const MZ_M4A_EXT: &str = "m4a_";
+
+pub const PNG_EXT: &str = "png";
+pub const OGG_EXT: &str = "ogg";
+pub const M4A_EXT: &str = "m4a";
+
+pub const ENCRYPTED_ASSET_EXTS: &[&str] = &[
+    MV_PNG_EXT, MV_OGG_EXT, MV_M4A_EXT, MZ_PNG_EXT, MZ_OGG_EXT, MZ_M4A_EXT,
+];
+pub const DECRYPTED_ASSETS_EXTS: &[&str] = &[PNG_EXT, OGG_EXT, M4A_EXT];
+
 #[derive(PartialEq, Clone, Copy, EnumIs, Display)]
 #[repr(u8)]
 pub enum FileType {
