@@ -104,6 +104,7 @@ use std::{
     ffi::OsStr,
     io::{Cursor, Read, Seek, SeekFrom},
 };
+use strum_macros::{Display, EnumIs};
 use thiserror::Error;
 
 const HEX_CHARS: &[u8; 16] = b"0123456789abcdef";
@@ -149,11 +150,14 @@ pub const RPGM_HEADER: [u8; HEADER_LENGTH] = [
     0x00, 0x00, 0x00, 0x00,
 ];
 
-#[derive(PartialEq, Clone, Copy)]
+#[derive(PartialEq, Clone, Copy, EnumIs, Display)]
 #[repr(u8)]
 pub enum FileType {
+    #[strum(to_string = "png")]
     PNG,
+    #[strum(to_string = "ogg")]
     OGG,
+    #[strum(to_string = "m4a")]
     M4A,
 }
 
