@@ -384,7 +384,7 @@ impl Decrypter {
 
                     unsafe {
                         M4A_HEADER[..CHUNK_SIZE].copy_from_slice(
-                            &header_type_box_size.to_le_bytes(),
+                            &header_type_box_size.to_be_bytes(),
                         );
                     }
                 }
