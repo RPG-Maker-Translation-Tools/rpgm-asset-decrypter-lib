@@ -619,3 +619,130 @@ impl Decrypter {
         Ok(())
     }
 }
+
+/// Decrypts RPG Maker file content using a temporary [`Decrypter`] instance.
+///
+/// This is a convenience wrapper around [`Decrypter::decrypt`].
+/// A new [`Decrypter`] is created internally, and the decryption key is
+/// auto-determined from the provided file data.
+///
+/// This function copies the contents of the file and returns a decrypted [`Vec<u8>`].
+/// If you want to avoid copying, use [`decrypt_in_place`] instead.
+///
+/// # Arguments
+///
+/// - `file_content` - The data of RPG Maker file.
+/// - `file_type` - [`FileType`], representing whether passed file content is PNG, OGG or M4A.
+///
+/// # Returns
+///
+/// - [`Error`] if the passed data has an invalid header or ends unexpectedly.
+/// - Decrypted [`Vec<u8>`] otherwise.
+///
+/// # Errors
+///
+/// - [`Error::InvalidHeader`] – if the provided `file_content` does not start with the RPG Maker header.
+/// - [`Error::UnexpectedEOF`] – if the data ends unexpectedly.
+pub fn decrypt(
+    file_content: &[u8],
+    file_type: FileType,
+) -> Result<Vec<u8>, Error> {
+    Decrypter::new().decrypt(file_content, file_type)
+}
+
+/// Decrypts RPG Maker file content in-place using a temporary [`Decrypter`] instance.
+///
+/// This is a convenience wrapper around [`Decrypter::decrypt_in_place`].
+/// A new [`Decrypter`] is created internally, and the decryption key is
+/// auto-determined from the provided file data.
+///
+/// This function modifies the provided buffer directly.
+/// After successful decryption, the decrypted data is valid starting at offset 16.
+///
+/// If you do not want to modify data in-place, use [`decrypt`] instead.
+///
+/// # Arguments
+///
+/// - `file_content` - The data of RPG Maker file.
+/// - `file_type` - [`FileType`], representing whether passed file content is PNG, OGG or M4A.
+///
+/// # Returns
+///
+/// - [`Error`] if the passed data has an invalid header or ends unexpectedly.
+/// - Nothing otherwise.
+///
+/// # Errors
+///
+/// - [`Error::InvalidHeader`] – if the provided `file_content` does not start with the RPG Maker header.
+/// - [`Error::UnexpectedEOF`] – if the data ends unexpectedly.
+pub fn decrypt_in_place(
+    file_content: &mut [u8],
+    file_type: FileType,
+) -> Result<(), Error> {
+    Decrypter::new().decrypt_in_place(file_content, file_type)?;
+    Ok(())
+}
+
+/// Encrypts file content using a key string and a temporary [`Decrypter`] instance.
+///
+/// This is a convenience wrapper around [`Decrypter::encrypt`].
+/// A new [`Decrypter`] is created internally, and the key is set from the provided string.
+///
+/// This function copies the file contents and returns an encrypted [`Vec<u8>`].
+/// The output includes the RPG Maker encryption header (`RPGM_HEADER`).
+///
+/// If you want to avoid copying, use [`encrypt_in_place`] instead.
+///
+/// # Arguments
+///
+/// - `file_content` - The data of `.png`, `.ogg` or `.m4a` file.
+/// - `key` - Encryption key string.
+///
+/// # Returns
+///
+/// - Encrypted [`Vec<u8>`] if the key is valid.
+/// - [`Error`] otherwise.
+///
+/// # Errors
+///
+/// - [`Error::InvalidKeyLength`] - if key's length is not 32 bytes.
+/// - [`Error::KeyNotSet`] – if key initialization fails.
+pub fn encrypt(file_content: &[u8], key: &str) -> Result<Vec<u8>, Error> {
+    let mut decrypter = Decrypter::new();
+    decrypter.set_key_from_str(key)?;
+    decrypter.encrypt(file_content)
+}
+
+/// Encrypts file content in-place using a key string and a temporary [`Decrypter`] instance.
+///
+/// This is a convenience wrapper around [`Decrypter::encrypt_in_place`].
+/// A new [`Decrypter`] is created internally, and the key is set from the provided string.
+///
+/// This function modifies the file data directly and produces *only* the encrypted payload.
+/// The RPG Maker encryption header is **not** added automatically; it must be prepended manually
+/// if producing a complete `.rpgmvp`, `.rpgmvo`, or `.rpgmvw` file.
+///
+/// If you do not want to modify data in-place, use [`encrypt`] instead.
+///
+/// # Arguments
+///
+/// - `file_content` - The data of `.png`, `.ogg` or `.m4a` file.
+/// - `key` - Encryption key string.
+///
+/// # Returns
+///
+/// - [`Error`] if key's length is not 32 bytes.
+/// - Nothing otherwise.
+///
+/// # Errors
+///
+/// - [`Error::InvalidKeyLength`] - if key's length is not 32 bytes.
+pub fn encrypt_in_place(
+    file_content: &mut [u8],
+    key: &str,
+) -> Result<(), Error> {
+    let mut decrypter = Decrypter::new();
+    decrypter.set_key_from_str(key)?;
+    decrypter.encrypt_in_place(file_content)?;
+    Ok(())
+}
