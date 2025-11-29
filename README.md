@@ -14,72 +14,198 @@ Used in my [rpgm-asset-decrypter-rs](https://github.com/savannstm/rpgm-asset-dec
 
 ## Usage
 
-Decrypt:
+### Decrypting Assets
 
-```rust
+#### Decrypt with copying
+
+```rust no_run
 use rpgm_asset_decrypter_lib::{Decrypter, FileType};
 use std::fs::{read, write};
 
-let mut decrypter = Decrypter::new();
-let file = "./picture.rpgmvp";
+fn main() {
+    let mut decrypter = Decrypter::new();
 
-let buf = read(file).unwrap();
+    let encrypted_path = "./image.rpgmvp";
+    let buf = read(encrypted_path).unwrap();
 
-// Decrypter auto-determines the encryption key from data, but you also need to pass a file type.
-let decrypted = decrypter.decrypt(&buf, FileType::PNG).unwrap();
+    // Decrypter automatically extracts the RPG Maker encryption key from the file
+    // but you must specify the original asset type.
+    let decrypted = decrypter.decrypt(&buf, FileType::PNG).unwrap();
 
-// You can also auto-deduce FileType from extension:
-// FileType::from("rpgmvp");
-// It supports conversions from &str and &OsStr.
-
-// Since [`Decrypter::decrypt`] copies the data, it's pretty much inefficient, and if you don't need to reuse the file data, you can decrypt it in-place:
-// let mut buf = read(file).unwrap();
-// [`Decrypter::decrypt_in_place`] returns a slice of the actual decrypted data, so use that.
-// let sliced = decrypter.decrypt_in_place(&mut buf, FileType::PNG);
-// write("./decrypted-picture.png", sliced).unwrap();
-
-write("./decrypted-picture.png", decrypted).unwrap();
+    write("./image.png", decrypted).unwrap();
+}
 ```
 
-Encrypt:
+#### Decrypt in place
 
-```rust
-use rpgm_asset_decrypter_lib::{Decrypter, DEFAULT_KEY};
+```rust no_run
+use rpgm_asset_decrypter_lib::{Decrypter, FileType};
 use std::fs::{read, write};
 
-let mut decrypter = Decrypter::new();
+fn main() {
+    let mut decrypter = Decrypter::new();
 
-let file = "./picture.png";
-let buf = read(file).unwrap();
+    let encrypted_path = "./image.rpgmvp";
+    let mut buf = read(encrypted_path).unwrap();
 
-// When encrypting, decrypter requires a key.
-// You can grab the key from System.json file or use [`Decrypter::set_key_from_file`] with RPG Maker encrypted file content.
-//
-// let encrypted = read("./picture.rpgmvp").unwrap();
-// decrypter.set_key_from_file(&encrypted, FileType::PNG);
-//
-// You can also use default key:
-// decrypter.set_key_from_str(DEFAULT_KEY);
-// but I don't recommend using that.
-let encrypted = decrypter.encrypt(&buf).unwrap();
+    // decrypt in place; returns a slice into `buf` without reallocating
+    let decrypted_slice = decrypter.decrypt_in_place(&mut buf, FileType::PNG).unwrap();
 
-// You can also auto-deduce FileType from extension:
-// FileType::from("rpgmvp");
-// It supports conversions from &str and &OsStr.
+    write("./image.png", decrypted_slice).unwrap();
+}
+```
 
-// Since [`Decrypter::encrypt`] copies the data, it's pretty much inefficient, and if you don't need to reuse the file data, you can encrypt it in-place:
-// let mut buf = read(file).unwrap();
-// [`Decrypter::decrypt_in_place`] doesn't include the RPG Maker header in encrypted data,
-// but we can write everything into a file more efficient with vectored I/O.
-// use rpgm_asset_decrypter_lib::{RPGM_HEADER};
-// use std::fs::File;
-// use std::io::{self, Write, IoSlice};
-// decrypter.encrypt_in_place(&mut buf);
-// let mut file = File::create("./encrypted-picture.rpgmvp");
-// let bufs = [IoSlice::new(RPGM_HEADER), IoSlice::new(buf)];
-// file.write_vectored(&bufs).unwrap();
+#### Deducing FileType from extension
 
-write("./encrypted-picture.rpgmvp", encrypted).unwrap();
+```rust no_run
+use rpgm_asset_decrypter_lib::{Decrypter, FileType};
+use std::fs::{read, write};
+use std::convert::TryFrom;
+
+fn main() {
+    let mut decrypter = Decrypter::new();
+
+    let encrypted_path = "./image.rpgmvp";
+    let mut buf = read(encrypted_path).unwrap();
+
+    // Deduce from &str; &OsStr also works
+    let filetype = FileType::try_from("rpgmvp").unwrap();
+
+    let decrypted = decrypter.decrypt_in_place(&mut buf, filetype).unwrap();
+
+    write("./image.png", decrypted).unwrap();
+}
+```
+
+### Encrypting Assets
+
+#### Encrypt with copying
+
+```rust no_run
+use rpgm_asset_decrypter_lib::{Decrypter, FileType, DEFAULT_KEY};
+use std::fs::{read, write};
+
+fn main() {
+    let mut decrypter = Decrypter::new();
+
+    // You can set a custom key (recommended):
+    //
+    // 1. From an existing encrypted file:
+    // let encrypted = read("./image.rpgmvp").unwrap();
+    // decrypter.set_key_from_file(&encrypted, FileType::PNG);
+    //
+    // 2. Or use the default key (not recommended)
+    decrypter.set_key_from_str(DEFAULT_KEY);
+
+    let png_path = "./picture.png";
+    let buf = read(png_path).unwrap();
+
+    let encrypted = decrypter.encrypt(&buf).unwrap();
+
+    write("./image.rpgmvp", encrypted).unwrap();
+}
+```
+
+#### Encrypt in place
+
+`encrypt_in_place` produces the **raw encrypted payload**, without the RPG Maker header.
+To write a valid `.rpgmvp`, prepend `RPGM_HEADER`.
+
+```rust no_run
+use rpgm_asset_decrypter_lib::{Decrypter, DEFAULT_KEY, RPGM_HEADER};
+use std::fs::{read, File};
+use std::io::{Write, IoSlice};
+
+fn main() {
+    let mut decrypter = Decrypter::new();
+
+    // You can set a custom key (recommended):
+    //
+    // 1. From an existing encrypted file:
+    // let encrypted = read("./image.rpgmvp").unwrap();
+    // decrypter.set_key_from_file(&encrypted, FileType::PNG);
+    //
+    // 2. Or use the default key (not recommended)
+    decrypter.set_key_from_str(DEFAULT_KEY);
+
+    let png_path = "./image.png";
+    let mut buf = read(png_path).unwrap();
+
+    decrypter.encrypt_in_place(&mut buf).unwrap();
+
+    // Write a proper RPG Maker encrypted file
+    let mut out = File::create("./image.rpgmvp").unwrap();
+    let segments = [
+        IoSlice::new(RPGM_HEADER),
+        IoSlice::new(&buf),
+    ];
+
+    out.write_vectored(&segments).unwrap();
+}
+```
+
+### Using convenience wrappers
+
+The crate exposes wrapper functions for quick encrypt/decrypt without manually instantiating `Decrypter`.
+
+#### `decrypt` wrapper
+
+```rust no_run
+use rpgm_asset_decrypter_lib::{decrypt, FileType};
+use std::fs::{read, write};
+
+fn main() {
+    let buf = read("./image.rpgmvp").unwrap();
+    let out = decrypt(&buf, FileType::PNG).unwrap();
+    write("./image.png", out).unwrap();
+}
+```
+
+#### `decrypt_in_place` wrapper
+
+```rust no_run
+use rpgm_asset_decrypter_lib::{decrypt_in_place, FileType, HEADER_LENGTH};
+use std::fs::{read, write};
+
+fn main() {
+    let mut buf = read("./image.rpgmvp").unwrap();
+    // decrypt_in_place wrapper doesn't return a slice to the decrypted data, you must slice it manually.
+    decrypt_in_place(&mut buf, FileType::PNG).unwrap();
+    write("./image.png", &buf[HEADER_LENGTH..]).unwrap();
+}
+```
+
+#### `encrypt` wrapper
+
+```rust no_run
+use rpgm_asset_decrypter_lib::{encrypt, DEFAULT_KEY};
+use std::fs::{read, write};
+
+fn main() {
+    let buf = read("./image.png").unwrap();
+    let encrypted = encrypt(&buf, DEFAULT_KEY).unwrap();
+
+    write("./image.rpgmvp", encrypted).unwrap();
+}
+```
+
+#### `encrypt_in_place` wrapper
+
+```rust no_run
+use rpgm_asset_decrypter_lib::{encrypt_in_place, DEFAULT_KEY, RPGM_HEADER};
+use std::fs::{read, File};
+use std::io::{Write, IoSlice};
+
+fn main() {
+    let mut buf = read("./image.png").unwrap();
+
+    // encrypt_in_place does NOT write the header
+    encrypt_in_place(&mut buf, DEFAULT_KEY).unwrap();
+
+    let mut file = File::create("./image.rpgmvp").unwrap();
+    let bufs = [IoSlice::new(RPGM_HEADER), IoSlice::new(&buf)];
+    file.write_vectored(&bufs).unwrap();
+}
 ```
 
 ## Features
