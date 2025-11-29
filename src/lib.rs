@@ -100,6 +100,7 @@ Project is licensed under WTFPL.
 */
 
 use std::{
+    convert::TryFrom,
     ffi::OsStr,
     io::{Cursor, Read, Seek, SeekFrom},
 };
@@ -156,28 +157,32 @@ pub enum FileType {
     M4A,
 }
 
-impl From<&str> for FileType {
-    fn from(value: &str) -> Self {
+impl TryFrom<&str> for FileType {
+    type Error = &'static str;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
-            "rpgmvp" | "png_" => FileType::PNG,
-            "rpgmvo" | "ogg_" => FileType::OGG,
-            "rpgmvm" | "m4a_" => FileType::M4A,
-            _ => panic!(),
+            MV_PNG_EXT | MZ_PNG_EXT => Ok(FileType::PNG),
+            MV_OGG_EXT | MZ_OGG_EXT => Ok(FileType::OGG),
+            MV_M4A_EXT | MZ_M4A_EXT => Ok(FileType::M4A),
+            _ => Err("Extension not supported"),
         }
     }
 }
 
 // [`PathBuf::extension`] returns &OsStr, so implement this for convenience.
-impl From<&OsStr> for FileType {
-    fn from(value: &OsStr) -> Self {
-        if value == "rpgmvp" || value == "png_" {
-            FileType::PNG
-        } else if value == "rpgmvo" || value == "ogg_" {
-            FileType::OGG
-        } else if value == "rpgmvm" || value == "m4a_" {
-            FileType::M4A
+impl TryFrom<&OsStr> for FileType {
+    type Error = &'static str;
+
+    fn try_from(value: &OsStr) -> Result<Self, Self::Error> {
+        if value == MV_PNG_EXT || value == MZ_PNG_EXT {
+            Ok(FileType::PNG)
+        } else if value == MV_OGG_EXT || value == MZ_OGG_EXT {
+            Ok(FileType::OGG)
+        } else if value == MV_M4A_EXT || value == MZ_M4A_EXT {
+            Ok(FileType::M4A)
         } else {
-            panic!()
+            Err("Extension not supported")
         }
     }
 }
