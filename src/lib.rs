@@ -274,7 +274,7 @@ impl Decrypter {
 
     /// Sets the key of decrypter from encrypted `file_content` data.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// - `file_content` - The data of RPG Maker file.
     ///
@@ -377,7 +377,7 @@ impl Decrypter {
     /// This function copies the contents of the file and returns decrypted [`Vec<u8>`] copy.
     /// If you want to avoid copying, see [`Decrypter::decrypt_in_place`] function.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// - `file_content` - The data of RPG Maker file.
     /// - `file_type` - [`FileType`], representing whether passed file content is PNG, OGG or M4A.
@@ -420,7 +420,7 @@ impl Decrypter {
     ///
     /// Decrypted data is only valid starting at offset 16. This function returns the reference to the correct slice.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// - `file_content` - The data of RPG Maker file.
     /// - `file_type` - [`FileType`], representing whether passed file content is PNG, OGG or M4A.
@@ -461,7 +461,7 @@ impl Decrypter {
     /// This function copies the contents of the file and returns encrypted [`Vec<u8>`] copy.
     /// If you want to avoid copying, see [`Decrypter::encrypt_in_place`] function.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// - `file_content` - The data of `.png`, `.ogg` or `.m4a` file.
     ///
@@ -501,7 +501,7 @@ impl Decrypter {
     /// Encrypted data comes without the RPG Maker header, so you need to manually prepend it - but you can decide where and how to do it most efficient.
     /// The header is exported as [`RPGM_HEADER`].
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// - `file_content` - The data of `.png`, `.ogg` or `.m4a` file.
     ///
@@ -536,7 +536,7 @@ impl Decrypter {
 /// This function copies the contents of the file and returns a decrypted [`Vec<u8>`].
 /// If you want to avoid copying, use [`decrypt_in_place`] instead.
 ///
-/// # Arguments
+/// # Parameters
 ///
 /// - `file_content` - The data of RPG Maker file.
 /// - `file_type` - [`FileType`], representing whether passed file content is PNG, OGG or M4A.
@@ -568,7 +568,7 @@ pub fn decrypt(
 ///
 /// If you do not want to modify data in-place, use [`decrypt`] instead.
 ///
-/// # Arguments
+/// # Parameters
 ///
 /// - `file_content` - The data of RPG Maker file.
 /// - `file_type` - [`FileType`], representing whether passed file content is PNG, OGG or M4A.
@@ -600,7 +600,7 @@ pub fn decrypt_in_place(
 ///
 /// If you want to avoid copying, use [`encrypt_in_place`] instead.
 ///
-/// # Arguments
+/// # Parameters
 ///
 /// - `file_content` - The data of `.png`, `.ogg` or `.m4a` file.
 /// - `key` - Encryption key string.
@@ -631,7 +631,7 @@ pub fn encrypt(file_content: &[u8], key: &str) -> Result<Vec<u8>, Error> {
 ///
 /// If you do not want to modify data in-place, use [`encrypt`] instead.
 ///
-/// # Arguments
+/// # Parameters
 ///
 /// - `file_content` - The data of `.png`, `.ogg` or `.m4a` file.
 /// - `key` - Encryption key string.
