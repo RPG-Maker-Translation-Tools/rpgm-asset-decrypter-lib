@@ -5,13 +5,10 @@
 #![allow(clippy::cast_sign_loss)]
 #![allow(clippy::deref_addrof)]
 #![doc = include_str!("../README.md")]
+#![cfg_attr(not(feature = "std"), no_std)]
 
-use std::{
-    convert::TryFrom,
-    ffi::OsStr,
-    fmt::Display,
-    io::{Cursor, Read, Seek, SeekFrom},
-};
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 macro_rules! sizeof {
@@ -102,8 +99,8 @@ impl FileType {
     }
 }
 
-impl Display for FileType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for FileType {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Self::PNG => f.write_str("png"),
             Self::OGG => f.write_str("ogg"),
@@ -112,7 +109,7 @@ impl Display for FileType {
     }
 }
 
-impl TryFrom<&str> for FileType {
+impl core::convert::TryFrom<&str> for FileType {
     type Error = &'static str;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
@@ -126,10 +123,11 @@ impl TryFrom<&str> for FileType {
 }
 
 // [`PathBuf::extension`] returns &OsStr, so implement this for convenience.
-impl TryFrom<&OsStr> for FileType {
+#[cfg(feature = "std")]
+impl core::convert::TryFrom<&std::ffi::OsStr> for FileType {
     type Error = &'static str;
 
-    fn try_from(value: &OsStr) -> Result<Self, Self::Error> {
+    fn try_from(value: &std::ffi::OsStr) -> Result<Self, Self::Error> {
         if value == MV_PNG_EXT || value == MZ_PNG_EXT {
             Ok(FileType::PNG)
         } else if value == MV_OGG_EXT || value == MZ_OGG_EXT {
@@ -185,7 +183,7 @@ impl Decrypter {
     fn set_key_from_hex(&mut self) {
         for (j, i) in (0..self.key_hex.len()).step_by(2).enumerate() {
             let u8_hex = [self.key_hex[i], self.key_hex[i + 1]];
-            let u8_hex_str = unsafe { std::str::from_utf8_unchecked(&u8_hex) };
+            let u8_hex_str = unsafe { core::str::from_utf8_unchecked(&u8_hex) };
             self.key[j] = u8::from_str_radix(u8_hex_str, 16).unwrap();
         }
 
@@ -202,41 +200,34 @@ impl Decrypter {
         }
     }
 
-    fn read_ogg_page_serialno(file_content: &mut Cursor<&[u8]>) -> u32 {
+    fn read_ogg_page_serialno(buf: &[u8], pos: &mut usize) -> u32 {
         const HEADER_SIZE: usize = 27;
         const SERIALNO_POS: usize = 14;
 
-        let mut header: [u8; HEADER_SIZE] = [0; HEADER_SIZE];
+        let header = &buf[*pos..*pos + HEADER_SIZE];
+        *pos += HEADER_SIZE;
 
-        file_content.read_exact(&mut header).unwrap();
+        let segment_count = header[26] as usize;
 
-        let segment_count: usize = header[26] as usize;
-        let mut segment_table: [u8; u8::MAX as usize] = [0; u8::MAX as usize];
+        let segment_table = &buf[*pos..*pos + (u8::MAX as usize)];
+        *pos += u8::MAX as usize;
 
-        file_content.read_exact(&mut segment_table).unwrap();
+        let over_count = (u8::MAX as usize) - segment_count;
+        *pos -= over_count;
 
-        let over_count = i64::from(u8::MAX) - segment_count as i64;
-
-        file_content.seek(SeekFrom::Current(-over_count)).unwrap();
-
-        let mut body_length: i64 = 0;
-
-        for segment in segment_table.iter().take(segment_count) {
-            body_length += i64::from(*segment);
+        let mut body_length: usize = 0;
+        for &segment in &segment_table[..segment_count] {
+            body_length += segment as usize;
         }
 
-        file_content.seek(SeekFrom::Current(body_length)).unwrap();
+        *pos += body_length;
 
         let header_serialno = unsafe {
             *header[SERIALNO_POS..SERIALNO_POS + sizeof!(u32)]
                 .as_ptr()
                 .cast::<[u8; sizeof!(u32)]>()
         };
-
-        u32::from(header_serialno[0])
-            | (u32::from(header_serialno[1]) << 8)
-            | (u32::from(header_serialno[2]) << 16)
-            | (u32::from(header_serialno[3]) << 24)
+        u32::from_be_bytes(header_serialno)
     }
 
     /// Returns the decrypter's key, or [`None`] if it's not set.
@@ -247,7 +238,7 @@ impl Decrypter {
             return None;
         }
 
-        Some(unsafe { std::str::from_utf8_unchecked(&self.key_hex) })
+        Some(unsafe { core::str::from_utf8_unchecked(&self.key_hex) })
     }
 
     /// Sets the decrypter's key to provided `&str` hex string.
@@ -335,13 +326,12 @@ impl Decrypter {
         // Since stream serial number is incorrect in OGG_HEADER because it's different for each file, we need to seek to the second page of the stream and grab the serial number from there, and then replace it in the header.
         // Serial number is persistent across all pages of the stream, so we can gan grab it from the second page and replace in the first.
         if file_type.is_ogg() {
-            let mut file_content_cursor =
-                Cursor::new(&file_content[HEADER_LENGTH..]);
+            let mut pos = HEADER_LENGTH;
 
-            Decrypter::read_ogg_page_serialno(&mut file_content_cursor);
+            Self::read_ogg_page_serialno(&file_content, &mut pos);
 
             let serialno =
-                Decrypter::read_ogg_page_serialno(&mut file_content_cursor);
+                Self::read_ogg_page_serialno(&file_content, &mut pos);
 
             unsafe {
                 OGG_HEADER[14..16]
@@ -368,7 +358,7 @@ impl Decrypter {
         }
 
         self.set_key_from_hex();
-        Ok(unsafe { std::str::from_utf8_unchecked(&self.key_hex) })
+        Ok(unsafe { core::str::from_utf8_unchecked(&self.key_hex) })
     }
 
     /// Decrypts RPG Maker file content.
@@ -392,6 +382,7 @@ impl Decrypter {
     /// - [`Error::InvalidHeader`] - if passed `file_content` data has invalid header.
     /// - [`Error::UnexpectedEOF`] - if passed `file_content` data ends unexpectedly.
     #[inline]
+    #[cfg(feature = "std")]
     pub fn decrypt(
         &mut self,
         file_content: &[u8],
@@ -474,6 +465,7 @@ impl Decrypter {
     ///
     /// - [`Error::KeyNotSet`] - if decrypter's key is not set.
     #[inline]
+    #[cfg(feature = "std")]
     pub fn encrypt(&self, file_content: &[u8]) -> Result<Vec<u8>, Error> {
         if !self.has_key {
             return Err(Error::KeyNotSet);
@@ -550,6 +542,7 @@ impl Decrypter {
 ///
 /// - [`Error::InvalidHeader`] – if the provided `file_content` does not start with the RPG Maker header.
 /// - [`Error::UnexpectedEOF`] – if the data ends unexpectedly.
+#[cfg(feature = "std")]
 pub fn decrypt(
     file_content: &[u8],
     file_type: FileType,
@@ -614,6 +607,7 @@ pub fn decrypt_in_place(
 ///
 /// - [`Error::InvalidKeyLength`] - if key's length is not 32 bytes.
 /// - [`Error::KeyNotSet`] – if key initialization fails.
+#[cfg(feature = "std")]
 pub fn encrypt(file_content: &[u8], key: &str) -> Result<Vec<u8>, Error> {
     let mut decrypter = Decrypter::new();
     decrypter.set_key_from_str(key)?;
