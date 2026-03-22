@@ -1,3 +1,4 @@
+#![cfg_attr(not(feature = "std"), no_std)]
 #![warn(clippy::all, clippy::pedantic)]
 #![allow(clippy::needless_doctest_main)]
 #![allow(clippy::cast_possible_truncation)]
@@ -5,14 +6,13 @@
 #![allow(clippy::cast_sign_loss)]
 #![allow(clippy::deref_addrof)]
 #![doc = include_str!("../README.md")]
-#![cfg_attr(not(feature = "std"), no_std)]
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 macro_rules! sizeof {
-    ($t:ty) => {{ size_of::<$t>() }};
+    ($t:ty) => {{ core::mem::size_of::<$t>() }};
 }
 
 const HEX_CHARS: &[u8; 16] = b"0123456789abcdef";

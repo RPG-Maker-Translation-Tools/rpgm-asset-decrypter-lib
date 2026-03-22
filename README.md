@@ -2,7 +2,7 @@
 
 **BLAZINGLY** :fire: fast and tiny library for decrypting RPG Maker MV/MZ `rpgmvp`/`png_`, `rpgmvo`/`ogg_`, `rpgmvm`/`m4a_` assets.
 
-This project essentially is a rewrite of Petschko's [RPG-Maker-MV-Decrypter](https://gitlab.com/Petschko/RPG-Maker-MV-Decrypter) in Rust, but it also implements encryption key extraction from non-image files, such as `rpgmvo`/`ogg_` and `rpgmvm`/`m4a_`.
+This project essentially is a rewrite of Petschko's [RPG-Maker-MV-Decrypter](https://gitlab.com/Petschko/RPG-Maker-MV-Decrypter) in Rust, but it also implements encryption key extraction from non-image files, such as `rpgmvo`/`ogg_` and `rpgmvm`/`m4a_`, **and** can be used in `no_std` environments.
 
 And since it's implemented in Rust 🦀🦀🦀, it's also very tiny, clean, and performant.
 
@@ -210,7 +210,8 @@ fn main() {
 
 ## Features
 
--   `serde` - enables serde serialization/deserialization for `Error` type.
+- `default` - default feature enables the usage of `std`. If you're using this crate in a `no_std` environment for some reason, you need to disable default feature. Without this feature, `encrypt` and `decrypt` functions, as well as `From<OsStr>` conversion for `FileType` aren't available, since they require `Vec` and `OsStr` from `std` respectively.
+- `serde` - enables serde serialization/deserialization for `Error` type.
 
 ## Support
 
@@ -218,9 +219,9 @@ fn main() {
 
 If you could, please consider supporting us through:
 
--   [Ko-fi](https://ko-fi.com/savannstm)
--   [Patreon](https://www.patreon.com/cw/savannstm)
--   [Boosty](https://boosty.to/mcdeimos)
+- [Ko-fi](https://ko-fi.com/savannstm)
+- [Patreon](https://www.patreon.com/cw/savannstm)
+- [Boosty](https://boosty.to/mcdeimos)
 
 Even if you don't, it's fine. We'll continue to do as we right now.
 
