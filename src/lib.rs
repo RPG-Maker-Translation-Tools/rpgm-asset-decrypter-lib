@@ -227,7 +227,8 @@ impl Decrypter {
                 .as_ptr()
                 .cast::<[u8; sizeof!(u32)]>()
         };
-        u32::from_be_bytes(header_serialno)
+
+        u32::from_le_bytes(header_serialno)
     }
 
     /// Returns the decrypter's key, or [`None`] if it's not set.
