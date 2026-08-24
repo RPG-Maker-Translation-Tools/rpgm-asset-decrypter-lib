@@ -1,0 +1,55 @@
+{
+    "name": "rpgmasd-lib",
+    "version": "3.2.2",
+    "description": "A library for decrypting/encrypting RPG Maker MV/MZ audio and image assets.",
+    "keywords": [
+        "rpg-maker",
+        "rpgmvp",
+        "rpgmvo",
+        "rpgmvm",
+        "decrypt",
+        "encrypt",
+        "asset"
+    ],
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "files": [
+        "dist",
+        "README.md",
+        "LICENSE.md"
+    ],
+    "engines": {
+        "node": ">=18"
+    },
+    "scripts": {
+        "build": "tsc -p tsconfig.build.json",
+        "check": "tsc",
+        "test": "node --test \"tests/**/*.test.ts\"",
+        "fmt": "prettier --write .",
+        "fmt:check": "prettier --check .",
+        "prepublishOnly": "npm run build"
+    },
+    "author": "savannstm <savannstm@gmail.com>",
+    "license": "WTFPL",
+    "homepage": "https://github.com/savannstm/rpgm-asset-decrypter-lib/tree/main/ts#readme",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/savannstm/rpgm-asset-decrypter-lib.git",
+        "directory": "ts"
+    },
+    "bugs": {
+        "url": "https://github.com/savannstm/rpgm-asset-decrypter-lib/issues"
+    },
+    "devDependencies": {
+        "typescript": "^6.0.3",
+        "@types/node": "^18.19.130",
+        "prettier": "^3.9.6"
+    }
+}
