@@ -8,6 +8,11 @@ And since it's implemented in Rust 🦀🦀🦀, it's also very tiny, clean, and
 
 Used in my [rpgm-asset-decrypter-rs](https://github.com/savannstm/rpgm-asset-decrypter-rs) CLI tool.
 
+This crate has two ports:
+
+- [TypeScript](./ts) - a rewrite in TypeScript.
+- [WASM](./wasm) - WASM bindings generated from Rust code.
+
 ## Installation
 
 `cargo add rpgm-asset-decrypter-lib`
