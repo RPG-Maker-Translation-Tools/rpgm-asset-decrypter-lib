@@ -4,7 +4,7 @@
 
 TypeScript port of the [`rpgm-asset-decrypter-lib`](https://github.com/savannstm/rpgm-asset-decrypter-lib) Rust crate, kept behaviorally identical to that reference implementation. Operates on `Uint8Array` buffers in place wherever possible.
 
-Pure `Uint8Array`/`DataView`, no runtime-specific APIs — works the same under Node, Bun, and Deno.
+Pure `Uint8Array`/`DataView`, no runtime-specific APIs - works the same under Node, Bun, and Deno.
 
 Used in my [rpgm-asset-decrypter-rs](https://github.com/savannstm/rpgm-asset-decrypter-rs) CLI tool.
 
