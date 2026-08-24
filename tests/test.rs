@@ -99,17 +99,13 @@ fn png_cases() -> Vec<TestCase<'static>> {
 
 fn run_decrypt(case: &TestCase) {
     let mut d = Decrypter::new();
-    let decrypted = d
-        .decrypt(&read(case.path).unwrap(), case.file_type)
-        .unwrap();
+    let decrypted = d.decrypt(&read(case.path).unwrap(), case.file_type).unwrap();
     assert!((case.validator)(&decrypted));
 }
 
 fn run_encrypt_roundtrip(case: &TestCase) {
     let mut d = Decrypter::new();
-    let original = d
-        .decrypt(&read(case.path).unwrap(), case.file_type)
-        .unwrap();
+    let original = d.decrypt(&read(case.path).unwrap(), case.file_type).unwrap();
 
     let encrypted = d.encrypt(&original).unwrap();
     let decrypted = d.decrypt(&encrypted, case.file_type).unwrap();
@@ -129,9 +125,7 @@ fn run_decrypt_in_place(case: &TestCase) {
 fn run_encrypt_in_place_roundtrip(case: &TestCase) {
     let mut d = Decrypter::new();
 
-    let clean = d
-        .decrypt(&read(case.path).unwrap(), case.file_type)
-        .unwrap();
+    let clean = d.decrypt(&read(case.path).unwrap(), case.file_type).unwrap();
     let mut buf = clean.clone();
 
     d.encrypt_in_place(&mut buf).unwrap();

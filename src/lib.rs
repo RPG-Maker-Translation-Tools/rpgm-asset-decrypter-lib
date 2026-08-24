@@ -29,8 +29,7 @@ pub const DEFAULT_KEY: &str = "d41d8cd98f00b204e9800998ecf8427e";
 
 // For PNG, header is always the same, so we can expect valid decryption.
 const PNG_HEADER: &[u8] = &[
-    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
-    0x49, 0x48, 0x44, 0x52,
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
 ];
 
 // 0 - 3 - OggS
@@ -38,24 +37,20 @@ const PNG_HEADER: &[u8] = &[
 // 5 - header type, always 0x02, since first page always announces the beginning of the stream
 // 6 - 13 - granule position, always 0, since first page has no actual data
 //* 14 - 15 - part of 4-byte bitstream serial number, that actually differs between files
-static mut OGG_HEADER: [u8; HEADER_LENGTH] =
-    [79, 103, 103, 83, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+static mut OGG_HEADER: [u8; HEADER_LENGTH] = [79, 103, 103, 83, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
 //* 0 - 3 - type box size, actually differs between files
 // 4 - 7 - ftyp, always the same
 // 8 - 11 - M4A_, always the same, may be different 4 characters, but extremely unlikely
 // 12 - 15 - minor version, mostly junk, doesn't matter
-static mut M4A_HEADER: [u8; HEADER_LENGTH] =
-    [0, 0, 0, 28, 102, 116, 121, 112, 77, 52, 65, 32, 0, 0, 2, 0];
+static mut M4A_HEADER: [u8; HEADER_LENGTH] = [0, 0, 0, 28, 102, 116, 121, 112, 77, 52, 65, 32, 0, 0, 2, 0];
 
 // For finding type box size
-const M4A_POST_HEADER_BOXES: &[&[u8]] =
-    &[b"moov", b"mdat", b"free", b"skip", b"wide", b"pnot"];
+const M4A_POST_HEADER_BOXES: &[&[u8]] = &[b"moov", b"mdat", b"free", b"skip", b"wide", b"pnot"];
 
 // Every encrypted file includes this header.
 pub const RPGM_HEADER: &[u8] = &[
-    0x52, 0x50, 0x47, 0x4d, 0x56, 0x00, 0x00, 0x00, 0x00, 0x03, 0x01, 0x00,
-    0x00, 0x00, 0x00, 0x00,
+    0x52, 0x50, 0x47, 0x4d, 0x56, 0x00, 0x00, 0x00, 0x00, 0x03, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
 
 pub const MV_PNG_EXT: &str = "rpgmvp";
@@ -69,12 +64,10 @@ pub const PNG_EXT: &str = "png";
 pub const OGG_EXT: &str = "ogg";
 pub const M4A_EXT: &str = "m4a";
 
-pub const ENCRYPTED_ASSET_EXTS: &[&str] = &[
-    MV_PNG_EXT, MV_OGG_EXT, MV_M4A_EXT, MZ_PNG_EXT, MZ_OGG_EXT, MZ_M4A_EXT,
-];
+pub const ENCRYPTED_ASSET_EXTS: &[&str] = &[MV_PNG_EXT, MV_OGG_EXT, MV_M4A_EXT, MZ_PNG_EXT, MZ_OGG_EXT, MZ_M4A_EXT];
 pub const DECRYPTED_ASSETS_EXTS: &[&str] = &[PNG_EXT, OGG_EXT, M4A_EXT];
 
-#[derive(PartialEq, Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 #[repr(u8)]
 pub enum FileType {
     PNG,
@@ -143,19 +136,16 @@ impl core::convert::TryFrom<&std::ffi::OsStr> for FileType {
 #[derive(Debug, Error)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub enum Error {
-    #[error(
-        "Key must be set using any of `set_key` methods before calling `encrypt` function."
-    )]
+    #[error("Key must be set using any of `set_key` methods before calling `encrypt` function.")]
     KeyNotSet,
     #[error("Key must have a fixed length of 32 characters.")]
     InvalidKeyLength,
     #[error(
-        "Passed data has invalid header. RPG Maker encrypted files should always start with RPGMV header. Either passed data is not RPG Maker data or it's corrupted."
+        "Passed data has invalid header. RPG Maker encrypted files should always start with RPGMV header. Either \
+         passed data is not RPG Maker data or it's corrupted."
     )]
     InvalidHeader,
-    #[error(
-        "Unexpected end of file encountered. Either passed data is not RPG Maker data or it's corrupted."
-    )]
+    #[error("Unexpected end of file encountered. Either passed data is not RPG Maker data or it's corrupted.")]
     UnexpectedEOF,
 }
 
@@ -257,8 +247,7 @@ impl Decrypter {
             return Err(Error::InvalidKeyLength);
         }
 
-        self.key_hex =
-            unsafe { *key.as_bytes().as_ptr().cast::<[u8; KEY_STR_LENGTH]>() };
+        self.key_hex = unsafe { *key.as_bytes().as_ptr().cast::<[u8; KEY_STR_LENGTH]>() };
         self.set_key_from_hex();
 
         Ok(())
@@ -280,18 +269,12 @@ impl Decrypter {
     /// - [`Error::InvalidHeader`] - if passed `file_content` data contains invalid header.
     /// - [`Error::UnexpectedEOF`] - if passed `file_content` data ends unexpectedly.
     #[inline]
-    pub fn set_key_from_file(
-        &mut self,
-        file_content: &[u8],
-        file_type: FileType,
-    ) -> Result<&str, Error> {
+    pub fn set_key_from_file(&mut self, file_content: &[u8], file_type: FileType) -> Result<&str, Error> {
         if !file_content.starts_with(RPGM_HEADER) {
             return Err(Error::InvalidHeader);
         }
 
-        let Some(post_header) =
-            file_content.get(HEADER_LENGTH..HEADER_LENGTH * 2)
-        else {
+        let Some(post_header) = file_content.get(HEADER_LENGTH..HEADER_LENGTH * 2) else {
             return Err(Error::UnexpectedEOF);
         };
 
@@ -301,9 +284,7 @@ impl Decrypter {
         if file_type.is_m4a() {
             const CHUNK_SIZE: usize = sizeof!(u32);
 
-            let Some(file_start) =
-                file_content.get(HEADER_LENGTH..HEADER_LENGTH + 64)
-            else {
+            let Some(file_start) = file_content.get(HEADER_LENGTH..HEADER_LENGTH + 64) else {
                 return Err(Error::UnexpectedEOF);
             };
 
@@ -312,13 +293,10 @@ impl Decrypter {
             for (i, chunk) in file_start_chunks.enumerate() {
                 if M4A_POST_HEADER_BOXES.contains(&chunk) {
                     let prev_chunk_i = i - 1;
-                    let header_type_box_size =
-                        (prev_chunk_i * CHUNK_SIZE) as u32;
+                    let header_type_box_size = (prev_chunk_i * CHUNK_SIZE) as u32;
 
                     unsafe {
-                        M4A_HEADER[..CHUNK_SIZE].copy_from_slice(
-                            &header_type_box_size.to_be_bytes(),
-                        );
+                        M4A_HEADER[..CHUNK_SIZE].copy_from_slice(&header_type_box_size.to_be_bytes());
                     }
                 }
             }
@@ -331,12 +309,10 @@ impl Decrypter {
 
             Self::read_ogg_page_serialno(&file_content, &mut pos);
 
-            let serialno =
-                Self::read_ogg_page_serialno(&file_content, &mut pos);
+            let serialno = Self::read_ogg_page_serialno(&file_content, &mut pos);
 
             unsafe {
-                OGG_HEADER[14..16]
-                    .clone_from_slice(&serialno.to_le_bytes()[0..2]);
+                OGG_HEADER[14..16].clone_from_slice(&serialno.to_le_bytes()[0..2]);
             }
         }
 
@@ -384,11 +360,7 @@ impl Decrypter {
     /// - [`Error::UnexpectedEOF`] - if passed `file_content` data ends unexpectedly.
     #[inline]
     #[cfg(feature = "std")]
-    pub fn decrypt(
-        &mut self,
-        file_content: &[u8],
-        file_type: FileType,
-    ) -> Result<Vec<u8>, Error> {
+    pub fn decrypt(&mut self, file_content: &[u8], file_type: FileType) -> Result<Vec<u8>, Error> {
         if !file_content.starts_with(RPGM_HEADER) {
             return Err(Error::InvalidHeader);
         }
@@ -507,10 +479,7 @@ impl Decrypter {
     ///
     /// - [`Error::KeyNotSet`] - if decrypter's key is not set.
     #[inline]
-    pub fn encrypt_in_place(
-        &self,
-        file_content: &mut [u8],
-    ) -> Result<(), Error> {
+    pub fn encrypt_in_place(&self, file_content: &mut [u8]) -> Result<(), Error> {
         if !self.has_key {
             return Err(Error::KeyNotSet);
         }
@@ -544,10 +513,7 @@ impl Decrypter {
 /// - [`Error::InvalidHeader`] – if the provided `file_content` does not start with the RPG Maker header.
 /// - [`Error::UnexpectedEOF`] – if the data ends unexpectedly.
 #[cfg(feature = "std")]
-pub fn decrypt(
-    file_content: &[u8],
-    file_type: FileType,
-) -> Result<Vec<u8>, Error> {
+pub fn decrypt(file_content: &[u8], file_type: FileType) -> Result<Vec<u8>, Error> {
     Decrypter::new().decrypt(file_content, file_type)
 }
 
@@ -576,10 +542,7 @@ pub fn decrypt(
 ///
 /// - [`Error::InvalidHeader`] – if the provided `file_content` does not start with the RPG Maker header.
 /// - [`Error::UnexpectedEOF`] – if the data ends unexpectedly.
-pub fn decrypt_in_place(
-    file_content: &mut [u8],
-    file_type: FileType,
-) -> Result<(), Error> {
+pub fn decrypt_in_place(file_content: &mut [u8], file_type: FileType) -> Result<(), Error> {
     Decrypter::new().decrypt_in_place(file_content, file_type)?;
     Ok(())
 }
@@ -639,10 +602,7 @@ pub fn encrypt(file_content: &[u8], key: &str) -> Result<Vec<u8>, Error> {
 /// # Errors
 ///
 /// - [`Error::InvalidKeyLength`] - if key's length is not 32 bytes.
-pub fn encrypt_in_place(
-    file_content: &mut [u8],
-    key: &str,
-) -> Result<(), Error> {
+pub fn encrypt_in_place(file_content: &mut [u8], key: &str) -> Result<(), Error> {
     let mut decrypter = Decrypter::new();
     decrypter.set_key_from_str(key)?;
     decrypter.encrypt_in_place(file_content)?;
