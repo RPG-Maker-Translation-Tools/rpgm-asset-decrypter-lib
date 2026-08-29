@@ -1,9 +1,9 @@
 [package]
 name = "rpgmasd-capi"
-version = "3.2.3"
-authors = ["savannstm <savannstm@gmail.com>"]
-edition = "2021"
-rust-version = "1.71.0"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
 description = "C bindings for rpgm-asset-decrypter-lib, installable via cargo-c."
 repository = "https://github.com/RPG-Maker-Translation-Tools/rpgm-asset-decrypter-lib"
 documentation = "https://github.com/RPG-Maker-Translation-Tools/rpgm-asset-decrypter-lib/tree/master/crates/rpgmasd-capi"
