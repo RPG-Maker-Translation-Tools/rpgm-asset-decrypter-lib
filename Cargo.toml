@@ -1,6 +1,6 @@
 [package]
 name = "rpgm-asset-decrypter-lib"
-version = "3.2.2"
+version = "3.2.3"
 authors = ["savannstm <savannstm@gmail.com>"]
 edition = "2018"
 rust-version = "1.71.0"
@@ -11,11 +11,13 @@ repository = "https://github.com/savannstm/rpgm-asset-decrypter-lib"
 license-file = "LICENSE.md"
 
 [workspace]
-members = ["wasm"]
+members = ["crates/rpgmasd-wasm", "crates/rpgmasd-capi"]
 
 [features]
 default = ["std"]
-std = ["thiserror/std"]
+# The Vec-returning `encrypt`/`decrypt` API. Pulls in `alloc`.
+alloc = []
+std = ["alloc", "thiserror/std"]
 serde = ["dep:serde"]
 
 [dependencies]

@@ -5,14 +5,17 @@ authors = ["savannstm <savannstm@gmail.com>"]
 edition = "2021"
 rust-version = "1.71.0"
 description = "WASM bindings for rpgm-asset-decrypter-lib."
-license-file = "../LICENSE.md"
+repository = "https://github.com/RPG-Maker-Translation-Tools/rpgm-asset-decrypter-lib"
+documentation = "https://github.com/RPG-Maker-Translation-Tools/rpgm-asset-decrypter-lib/tree/master/crates/rpgmasd-wasm"
+license-file = "LICENSE.md"
+keywords = ["rpgmaker", "wasm", "decrypt", "encrypt", "assets"]
 publish = false
 
 [lib]
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-rpgm-asset-decrypter-lib = { path = ".." }
+rpgm-asset-decrypter-lib = { path = "../.." }
 wasm-bindgen = "=0.2.127"
 
 [package.metadata.wasm-pack.profile.release]

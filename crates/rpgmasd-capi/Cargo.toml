@@ -1,0 +1,38 @@
+[package]
+name = "rpgmasd-capi"
+version = "0.1.0"
+authors = ["savannstm <savannstm@gmail.com>"]
+edition = "2021"
+rust-version = "1.71.0"
+description = "C bindings for rpgm-asset-decrypter-lib, installable via cargo-c."
+repository = "https://github.com/RPG-Maker-Translation-Tools/rpgm-asset-decrypter-lib"
+documentation = "https://github.com/RPG-Maker-Translation-Tools/rpgm-asset-decrypter-lib/tree/master/crates/rpgmasd-capi"
+license-file = "../../LICENSE.md"
+keywords = ["rpgmaker", "capi", "decrypt", "encrypt", "assets"]
+publish = false
+
+[lib]
+name = "rpgmasd"
+crate-type = ["rlib", "cdylib", "staticlib"]
+doctest = false
+
+[features]
+default = ["std"]
+std = ["rpgm-asset-decrypter-lib/std"]
+capi = []
+
+[dependencies]
+rpgm-asset-decrypter-lib = { path = "../..", default-features = false }
+
+[package.metadata.capi.header]
+name = "rpgmasd"
+subdirectory = "rpgmasd"
+# Generation is disabled to not generate a header using cbindgen, we provide a header ourselves
+generation = false
+
+[package.metadata.capi.pkg_config]
+name = "rpgmasd"
+filename = "rpgmasd"
+
+[package.metadata.capi.library]
+name = "rpgmasd"

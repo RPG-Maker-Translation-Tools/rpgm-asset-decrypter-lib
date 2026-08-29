@@ -8,10 +8,11 @@ And since it's implemented in Rust 🦀🦀🦀, it's also very tiny, clean, and
 
 Used in my [rpgm-asset-decrypter-rs](https://github.com/savannstm/rpgm-asset-decrypter-rs) CLI tool.
 
-This crate has two ports:
+This crate has some ports:
 
 - [TypeScript](./ts) - a rewrite in TypeScript.
-- [WASM](./wasm) - WASM bindings generated from Rust code.
+- [C API](./crates/rpgmasd-capi/) - C bindings, installable via `cargo-c`.
+- [WASM](./crates/rpgmasd-wasm/) - WASM bindings generated from Rust code.
 
 ## Installation
 
@@ -60,7 +61,7 @@ fn main() {
 }
 ```
 
-#### Deducing FileType from extension
+#### Deducing `FileType` from extension
 
 ```rust no_run
 use rpgm_asset_decrypter_lib::{Decrypter, FileType};
@@ -215,7 +216,9 @@ fn main() {
 
 ## Features
 
-- `default` - default feature enables the usage of `std`. If you're using this crate in a `no_std` environment for some reason, you need to disable default feature. Without this feature, `encrypt` and `decrypt` functions, as well as `From<OsStr>` conversion for `FileType` aren't available, since they require `Vec` and `OsStr` from `std` respectively.
+- `default` - default feature enables the usage of `std`. If you're using this crate in a `no_std` environment, disable default features.
+- `alloc` - enables the `Vec`-returning `encrypt`/`decrypt` functions (pulled in automatically by `std`). Enable this alone for a `no_std` build that still has a heap; the in-place `encrypt_in_place`/`decrypt_in_place` functions need neither `alloc` nor `std` and are always available.
+- `std` - implies `alloc`; additionally enables the `From<&OsStr>` conversion for `FileType`, which needs real `std`.
 - `serde` - enables serde serialization/deserialization for `Error` type.
 
 ## Support

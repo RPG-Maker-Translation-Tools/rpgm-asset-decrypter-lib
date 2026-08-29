@@ -1,11 +1,17 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-#![warn(clippy::all, clippy::pedantic)]
+#![warn(clippy::all, clippy::pedantic, clippy::nursery)]
 #![allow(clippy::needless_doctest_main)]
 #![allow(clippy::cast_possible_truncation)]
 #![allow(clippy::cast_possible_wrap)]
 #![allow(clippy::cast_sign_loss)]
 #![allow(clippy::deref_addrof)]
 #![doc = include_str!("../README.md")]
+
+#[cfg(feature = "alloc")]
+extern crate alloc;
+
+#[cfg(all(feature = "alloc", not(feature = "std")))]
+use alloc::vec::Vec;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -67,7 +73,7 @@ pub const M4A_EXT: &str = "m4a";
 pub const ENCRYPTED_ASSET_EXTS: &[&str] = &[MV_PNG_EXT, MV_OGG_EXT, MV_M4A_EXT, MZ_PNG_EXT, MZ_OGG_EXT, MZ_M4A_EXT];
 pub const DECRYPTED_ASSETS_EXTS: &[&str] = &[PNG_EXT, OGG_EXT, M4A_EXT];
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum FileType {
     PNG,
@@ -77,17 +83,17 @@ pub enum FileType {
 
 impl FileType {
     #[must_use]
-    pub fn is_png(self) -> bool {
+    pub const fn is_png(self) -> bool {
         matches!(self, Self::PNG)
     }
 
     #[must_use]
-    pub fn is_ogg(self) -> bool {
+    pub const fn is_ogg(self) -> bool {
         matches!(self, Self::OGG)
     }
 
     #[must_use]
-    pub fn is_m4a(self) -> bool {
+    pub const fn is_m4a(self) -> bool {
         matches!(self, Self::M4A)
     }
 }
@@ -107,9 +113,9 @@ impl core::convert::TryFrom<&str> for FileType {
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
-            MV_PNG_EXT | MZ_PNG_EXT => Ok(FileType::PNG),
-            MV_OGG_EXT | MZ_OGG_EXT => Ok(FileType::OGG),
-            MV_M4A_EXT | MZ_M4A_EXT => Ok(FileType::M4A),
+            MV_PNG_EXT | MZ_PNG_EXT => Ok(Self::PNG),
+            MV_OGG_EXT | MZ_OGG_EXT => Ok(Self::OGG),
+            MV_M4A_EXT | MZ_M4A_EXT => Ok(Self::M4A),
             _ => Err("Extension not supported"),
         }
     }
@@ -122,11 +128,11 @@ impl core::convert::TryFrom<&std::ffi::OsStr> for FileType {
 
     fn try_from(value: &std::ffi::OsStr) -> Result<Self, Self::Error> {
         if value == MV_PNG_EXT || value == MZ_PNG_EXT {
-            Ok(FileType::PNG)
+            Ok(Self::PNG)
         } else if value == MV_OGG_EXT || value == MZ_OGG_EXT {
-            Ok(FileType::OGG)
+            Ok(Self::OGG)
         } else if value == MV_M4A_EXT || value == MZ_M4A_EXT {
-            Ok(FileType::M4A)
+            Ok(Self::M4A)
         } else {
             Err("Extension not supported")
         }
@@ -224,7 +230,7 @@ impl Decrypter {
     /// Returns the decrypter's key, or [`None`] if it's not set.
     #[inline]
     #[must_use]
-    pub fn key(&self) -> Option<&str> {
+    pub const fn key(&self) -> Option<&str> {
         if !self.has_key {
             return None;
         }
@@ -307,9 +313,9 @@ impl Decrypter {
         if file_type.is_ogg() {
             let mut pos = HEADER_LENGTH;
 
-            Self::read_ogg_page_serialno(&file_content, &mut pos);
+            Self::read_ogg_page_serialno(file_content, &mut pos);
 
-            let serialno = Self::read_ogg_page_serialno(&file_content, &mut pos);
+            let serialno = Self::read_ogg_page_serialno(file_content, &mut pos);
 
             unsafe {
                 OGG_HEADER[14..16].clone_from_slice(&serialno.to_le_bytes()[0..2]);
@@ -359,7 +365,7 @@ impl Decrypter {
     /// - [`Error::InvalidHeader`] - if passed `file_content` data has invalid header.
     /// - [`Error::UnexpectedEOF`] - if passed `file_content` data ends unexpectedly.
     #[inline]
-    #[cfg(feature = "std")]
+    #[cfg(feature = "alloc")]
     pub fn decrypt(&mut self, file_content: &[u8], file_type: FileType) -> Result<Vec<u8>, Error> {
         if !file_content.starts_with(RPGM_HEADER) {
             return Err(Error::InvalidHeader);
@@ -438,7 +444,7 @@ impl Decrypter {
     ///
     /// - [`Error::KeyNotSet`] - if decrypter's key is not set.
     #[inline]
-    #[cfg(feature = "std")]
+    #[cfg(feature = "alloc")]
     pub fn encrypt(&self, file_content: &[u8]) -> Result<Vec<u8>, Error> {
         if !self.has_key {
             return Err(Error::KeyNotSet);
@@ -512,7 +518,7 @@ impl Decrypter {
 ///
 /// - [`Error::InvalidHeader`] – if the provided `file_content` does not start with the RPG Maker header.
 /// - [`Error::UnexpectedEOF`] – if the data ends unexpectedly.
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 pub fn decrypt(file_content: &[u8], file_type: FileType) -> Result<Vec<u8>, Error> {
     Decrypter::new().decrypt(file_content, file_type)
 }
@@ -571,7 +577,7 @@ pub fn decrypt_in_place(file_content: &mut [u8], file_type: FileType) -> Result<
 ///
 /// - [`Error::InvalidKeyLength`] - if key's length is not 32 bytes.
 /// - [`Error::KeyNotSet`] – if key initialization fails.
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 pub fn encrypt(file_content: &[u8], key: &str) -> Result<Vec<u8>, Error> {
     let mut decrypter = Decrypter::new();
     decrypter.set_key_from_str(key)?;
