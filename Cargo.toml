@@ -1,23 +1,31 @@
 [package]
 name = "rpgm-asset-decrypter-lib"
-version = "3.2.3"
+version = "3.2.4"
 authors = ["savannstm <savannstm@gmail.com>"]
-edition = "2018"
-rust-version = "1.71.0"
+edition = "2021"
+rust-version = "1.77.0"
 description = "A library for decrypting/encrypting RPG Maker MV/MZ audio and image assets."
 documentation = "https://docs.rs/rpgm-asset-decrypter-lib"
 readme = "README.md"
-repository = "https://github.com/savannstm/rpgm-asset-decrypter-lib"
-license-file = "LICENSE.md"
+repository = "https://github.com/RPG-Maker-Translation-Tools/rpgm-asset-decrypter-lib"
+homepage = "https://crates.io/crates/rpgm-asset-decrypter-lib"
+license = "WTFPL"
+keywords = ["rpgmaker", "assets", "decrypt", "encrypt", "mv"]
+categories = ["encoding", "game-development"]
+exclude = ["/.gitignore", "/.gitattributes", "/rustfmt.toml", "/ts", "/tests"]
 
 [workspace]
-members = ["crates/rpgmasd-wasm", "crates/rpgmasd-capi"]
+members = ["crates/rpgmasd-capi", "crates/rpgmasd-wasm"]
 
 [workspace.package]
-version = "3.2.3"
+version = "3.2.4"
 edition = "2021"
-rust-version = "1.71.0"
+rust-version = "1.77.0"
 authors = ["savannstm <savannstm@gmail.com>"]
+description = "A library for decrypting/encrypting RPG Maker MV/MZ audio and image assets."
+license = "WTFPL"
+repository = "https://github.com/RPG-Maker-Translation-Tools/rpgm-asset-decrypter-lib"
+homepage = "https://crates.io/crates/rpgm-asset-decrypter-lib"
 
 [features]
 default = ["std"]
@@ -28,4 +36,4 @@ serde = ["dep:serde"]
 
 [dependencies]
 serde = { version = "1.0.229", features = ["derive"], optional = true }
-thiserror = { version = "2.0.20", default-features = false, features = [] }
+thiserror = { version = "2.0.21", default-features = false, features = [] }

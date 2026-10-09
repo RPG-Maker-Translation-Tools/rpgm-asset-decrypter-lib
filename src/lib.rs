@@ -73,7 +73,7 @@ pub const M4A_EXT: &str = "m4a";
 pub const ENCRYPTED_ASSET_EXTS: &[&str] = &[MV_PNG_EXT, MV_OGG_EXT, MV_M4A_EXT, MZ_PNG_EXT, MZ_OGG_EXT, MZ_M4A_EXT];
 pub const DECRYPTED_ASSETS_EXTS: &[&str] = &[PNG_EXT, OGG_EXT, M4A_EXT];
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 #[repr(u8)]
 pub enum FileType {
     PNG,
