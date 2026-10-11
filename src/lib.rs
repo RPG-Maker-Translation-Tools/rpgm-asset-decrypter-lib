@@ -1,10 +1,6 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![warn(clippy::all, clippy::pedantic, clippy::nursery)]
-#![allow(clippy::needless_doctest_main)]
 #![allow(clippy::cast_possible_truncation)]
-#![allow(clippy::cast_possible_wrap)]
-#![allow(clippy::cast_sign_loss)]
-#![allow(clippy::deref_addrof)]
 #![doc = include_str!("../README.md")]
 
 #[cfg(feature = "alloc")]
@@ -34,7 +30,7 @@ pub const DEFAULT_KEY: &str = "d41d8cd98f00b204e9800998ecf8427e";
 // RPG Maker's encoding is essentially taking source file's header (16 bytes) and xor'ing it upon a MD5 key produced from encryption key string. Most projects leave encryption key string empty, so resulting 'encryption' is just header xor'd with default MD5 key.
 
 // For PNG, header is always the same, so we can expect valid decryption.
-const PNG_HEADER: &[u8] = &[
+const PNG_HEADER: [u8; HEADER_LENGTH] = [
     0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
 ];
 
@@ -43,13 +39,13 @@ const PNG_HEADER: &[u8] = &[
 // 5 - header type, always 0x02, since first page always announces the beginning of the stream
 // 6 - 13 - granule position, always 0, since first page has no actual data
 //* 14 - 15 - part of 4-byte bitstream serial number, that actually differs between files
-static mut OGG_HEADER: [u8; HEADER_LENGTH] = [79, 103, 103, 83, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+const OGG_HEADER: [u8; HEADER_LENGTH] = [79, 103, 103, 83, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
 //* 0 - 3 - type box size, actually differs between files
 // 4 - 7 - ftyp, always the same
 // 8 - 11 - M4A_, always the same, may be different 4 characters, but extremely unlikely
 // 12 - 15 - minor version, mostly junk, doesn't matter
-static mut M4A_HEADER: [u8; HEADER_LENGTH] = [0, 0, 0, 28, 102, 116, 121, 112, 77, 52, 65, 32, 0, 0, 2, 0];
+const M4A_HEADER: [u8; HEADER_LENGTH] = [0, 0, 0, 28, 102, 116, 121, 112, 77, 52, 65, 32, 0, 0, 2, 0];
 
 // For finding type box size
 const M4A_POST_HEADER_BOXES: &[&[u8]] = &[b"moov", b"mdat", b"free", b"skip", b"wide", b"pnot"];
@@ -146,6 +142,8 @@ pub enum Error {
     KeyNotSet,
     #[error("Key must have a fixed length of 32 characters.")]
     InvalidKeyLength,
+    #[error("Key must consist of hexadecimal digits only.")]
+    InvalidKey,
     #[error(
         "Passed data has invalid header. RPG Maker encrypted files should always start with RPGMV header. Either \
          passed data is not RPG Maker data or it's corrupted."
@@ -175,18 +173,6 @@ impl Decrypter {
     }
 
     #[inline]
-    /// Converts human-readable hex to the real key bytes.
-    fn set_key_from_hex(&mut self) {
-        for (j, i) in (0..self.key_hex.len()).step_by(2).enumerate() {
-            let u8_hex = [self.key_hex[i], self.key_hex[i + 1]];
-            let u8_hex_str = unsafe { core::str::from_utf8_unchecked(&u8_hex) };
-            self.key[j] = u8::from_str_radix(u8_hex_str, 16).unwrap();
-        }
-
-        self.has_key = true;
-    }
-
-    #[inline]
     /// Either decrypts or encrypts the passed buffer, depending on the place this function was invoked from.
     ///
     /// Actual encryption is just: xor buffer's first 16 bytes with key.
@@ -196,35 +182,26 @@ impl Decrypter {
         }
     }
 
-    fn read_ogg_page_serialno(buf: &[u8], pos: &mut usize) -> u32 {
+    fn read_ogg_page_serialno(buf: &[u8], pos: &mut usize) -> Result<u32, Error> {
         const HEADER_SIZE: usize = 27;
+        const SEGMENT_COUNT_POS: usize = 26;
         const SERIALNO_POS: usize = 14;
 
-        let header = &buf[*pos..*pos + HEADER_SIZE];
-        *pos += HEADER_SIZE;
+        let page = buf.get(*pos..).ok_or(Error::UnexpectedEOF)?;
+        let header = page.get(..HEADER_SIZE).ok_or(Error::UnexpectedEOF)?;
 
-        let segment_count = header[26] as usize;
+        let segment_count = header[SEGMENT_COUNT_POS] as usize;
+        let segment_table = page[HEADER_SIZE..].get(..segment_count).ok_or(Error::UnexpectedEOF)?;
+        let body_length: usize = segment_table.iter().map(|&segment| segment as usize).sum();
 
-        let segment_table = &buf[*pos..*pos + (u8::MAX as usize)];
-        *pos += u8::MAX as usize;
+        *pos += HEADER_SIZE + segment_count + body_length;
 
-        let over_count = (u8::MAX as usize) - segment_count;
-        *pos -= over_count;
-
-        let mut body_length: usize = 0;
-        for &segment in &segment_table[..segment_count] {
-            body_length += segment as usize;
-        }
-
-        *pos += body_length;
-
-        let header_serialno = unsafe {
-            *header[SERIALNO_POS..SERIALNO_POS + sizeof!(u32)]
-                .as_ptr()
-                .cast::<[u8; sizeof!(u32)]>()
-        };
-
-        u32::from_le_bytes(header_serialno)
+        Ok(u32::from_le_bytes([
+            header[SERIALNO_POS],
+            header[SERIALNO_POS + 1],
+            header[SERIALNO_POS + 2],
+            header[SERIALNO_POS + 3],
+        ]))
     }
 
     /// Returns the decrypter's key, or [`None`] if it's not set.
@@ -242,19 +219,39 @@ impl Decrypter {
     ///
     /// # Returns
     ///
-    /// If key's length is not 32 bytes, the function fails and returns [`Error`].
+    /// If key's length is not 32 bytes or it contains non-hexadecimal characters, the function fails and
+    /// returns [`Error`], leaving the decrypter's previous key (if any) untouched.
     ///
     /// # Errors
     ///
     /// - [`Error::InvalidKeyLength`] - if key's length is not 32 bytes.
+    /// - [`Error::InvalidKey`] - if key contains anything but hexadecimal digits.
     #[inline]
     pub fn set_key_from_str(&mut self, key: &str) -> Result<(), Error> {
+        const fn hex_value(digit: u8) -> Option<u8> {
+            match digit {
+                b'0'..=b'9' => Some(digit - b'0'),
+                b'a'..=b'f' => Some(digit - b'a' + 10),
+                b'A'..=b'F' => Some(digit - b'A' + 10),
+                _ => None,
+            }
+        }
+
         if key.len() != KEY_STR_LENGTH {
             return Err(Error::InvalidKeyLength);
         }
 
-        self.key_hex = unsafe { *key.as_bytes().as_ptr().cast::<[u8; KEY_STR_LENGTH]>() };
-        self.set_key_from_hex();
+        let mut bytes = [0; KEY_LENGTH];
+        for (byte, pair) in bytes.iter_mut().zip(key.as_bytes().chunks_exact(2)) {
+            let (Some(high), Some(low)) = (hex_value(pair[0]), hex_value(pair[1])) else {
+                return Err(Error::InvalidKey);
+            };
+            *byte = high << 4 | low;
+        }
+
+        self.key = bytes;
+        self.key_hex.copy_from_slice(key.as_bytes());
+        self.has_key = true;
 
         Ok(())
     }
@@ -287,6 +284,13 @@ impl Decrypter {
         // Get proper M4A header box size
         //* We don't care about anything else for M4A, since `ftypM4A_` in M4A header can be easily replaced by `ftypSHIT`, and FFmpeg will have ZERO complains.
         //* The same goes for 12-15 bytes (inclusive), they can be overwritten with whatever integer.
+        // The signature is a per-call copy: it's patched with data from this file only.
+        let mut signature = match file_type {
+            FileType::PNG => PNG_HEADER,
+            FileType::OGG => OGG_HEADER,
+            FileType::M4A => M4A_HEADER,
+        };
+
         if file_type.is_m4a() {
             const CHUNK_SIZE: usize = sizeof!(u32);
 
@@ -297,13 +301,12 @@ impl Decrypter {
             let file_start_chunks = file_start.chunks_exact(CHUNK_SIZE);
 
             for (i, chunk) in file_start_chunks.enumerate() {
-                if M4A_POST_HEADER_BOXES.contains(&chunk) {
-                    let prev_chunk_i = i - 1;
+                // The first chunk can't be the box after the type box: there's no type box before it.
+                if let (true, Some(prev_chunk_i)) = (M4A_POST_HEADER_BOXES.contains(&chunk), i.checked_sub(1)) {
                     let header_type_box_size = (prev_chunk_i * CHUNK_SIZE) as u32;
-
-                    unsafe {
-                        M4A_HEADER[..CHUNK_SIZE].copy_from_slice(&header_type_box_size.to_be_bytes());
-                    }
+                    signature[..CHUNK_SIZE].copy_from_slice(&header_type_box_size.to_be_bytes());
+                    // The first box after the type box ends it; later matches are boxes further along.
+                    break;
                 }
             }
         }
@@ -313,34 +316,21 @@ impl Decrypter {
         if file_type.is_ogg() {
             let mut pos = HEADER_LENGTH;
 
-            Self::read_ogg_page_serialno(file_content, &mut pos);
+            Self::read_ogg_page_serialno(file_content, &mut pos)?;
 
-            let serialno = Self::read_ogg_page_serialno(file_content, &mut pos);
-
-            unsafe {
-                OGG_HEADER[14..16].clone_from_slice(&serialno.to_le_bytes()[0..2]);
-            }
+            let serialno = Self::read_ogg_page_serialno(file_content, &mut pos)?;
+            signature[14..16].copy_from_slice(&serialno.to_le_bytes()[0..2]);
         }
 
-        let mut j = 0;
-        for i in 0..HEADER_LENGTH {
-            let signature_byte = match file_type {
-                FileType::PNG => PNG_HEADER[i],
-                FileType::OGG => unsafe { OGG_HEADER[i] },
-                FileType::M4A => unsafe { M4A_HEADER[i] },
-            };
+        for (i, (&signature_byte, &encrypted_byte)) in signature.iter().zip(post_header).enumerate() {
+            let value = signature_byte ^ encrypted_byte;
 
-            let value = signature_byte ^ post_header[i];
-
-            let high = HEX_CHARS[(value >> 4) as usize];
-            let low = HEX_CHARS[(value & 0x0F) as usize];
-
-            self.key_hex[j] = high;
-            self.key_hex[j + 1] = low;
-            j += 2;
+            self.key[i] = value;
+            self.key_hex[i * 2] = HEX_CHARS[(value >> 4) as usize];
+            self.key_hex[i * 2 + 1] = HEX_CHARS[(value & 0x0F) as usize];
         }
 
-        self.set_key_from_hex();
+        self.has_key = true;
         Ok(unsafe { core::str::from_utf8_unchecked(&self.key_hex) })
     }
 

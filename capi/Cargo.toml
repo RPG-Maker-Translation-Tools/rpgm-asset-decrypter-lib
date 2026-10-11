@@ -1,22 +1,15 @@
 [package]
 name = "rpgmasd-capi"
 version.workspace = true
-authors.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 description.workspace = true
 license.workspace = true
-repository.workspace = true
-homepage.workspace = true
-documentation = "https://github.com/RPG-Maker-Translation-Tools/rpgm-asset-decrypter-lib/tree/master/crates/rpgmasd-capi"
-keywords = ["rpgmaker", "capi", "decrypt", "encrypt", "assets"]
 publish = false
 
 [package.metadata.capi.header]
 name = "rpgmasd"
 subdirectory = "rpgmasd"
-# Generation is disabled to not generate a header using cbindgen, we provide a header ourselves
-generation = false
 
 [package.metadata.capi.pkg_config]
 name = "rpgmasd"
@@ -27,7 +20,7 @@ name = "rpgmasd"
 
 [lib]
 name = "rpgmasd"
-crate-type = ["rlib", "cdylib", "staticlib"]
+crate-type = ["cdylib", "staticlib"]
 doctest = false
 
 [features]
@@ -36,4 +29,4 @@ std = ["rpgm-asset-decrypter-lib/std"]
 capi = []
 
 [dependencies]
-rpgm-asset-decrypter-lib = { path = "../..", default-features = false }
+rpgm-asset-decrypter-lib = { path = "..", default-features = false }

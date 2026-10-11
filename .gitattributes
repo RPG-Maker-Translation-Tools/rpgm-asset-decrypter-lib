@@ -1,2 +1,2 @@
-crates/rpgmasd-capi/**/*.c linguist-vendored
-crates/rpgmasd-capi/**/*.h linguist-vendored
+capi/**/*.c linguist-vendored
+capi/**/*.h linguist-vendored

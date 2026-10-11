@@ -10,9 +10,8 @@ Used in my [rpgm-asset-decrypter-rs](https://github.com/savannstm/rpgm-asset-dec
 
 This crate has some ports:
 
-- [TypeScript](./ts) - a rewrite in TypeScript.
-- [C API](./crates/rpgmasd-capi/) - C bindings, installable via `cargo-c`.
-- [WASM](./crates/rpgmasd-wasm/) - WASM bindings generated from Rust code.
+- [C API](./capi/) - C bindings, installable via `cargo-c`.
+- [WASM](./wasm/) - WASM bindings generated from Rust code.
 
 ## Installation
 
@@ -227,12 +226,11 @@ fn main() {
 
 If you could, please consider supporting us through:
 
+- [Boosty](https://boosty.to/mcdeimos) (has lower fees)
 - [Ko-fi](https://ko-fi.com/savannstm)
-- [Patreon](https://www.patreon.com/cw/savannstm)
-- [Boosty](https://boosty.to/mcdeimos)
 
-Even if you don't, it's fine. We'll continue to do as we right now.
+Even if you don't, we will still continue working on the project anyways.
 
 ## License
 
-Project is licensed under WTFPL.
+Project is licensed under [WTFPL](https://www.wtfpl.net/).

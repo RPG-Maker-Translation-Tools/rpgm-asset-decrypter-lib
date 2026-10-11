@@ -3,12 +3,12 @@ name = "rpgmasd-wasm"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
-rust-version.workspace = true
+rust-version = "1.81.0"
 description.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
-documentation = "https://github.com/RPG-Maker-Translation-Tools/rpgm-asset-decrypter-lib/tree/master/crates/rpgmasd-wasm"
+documentation = "https://github.com/RPG-Maker-Translation-Tools/rpgm-asset-decrypter-lib/tree/master/wasm"
 keywords = ["rpgmaker", "wasm", "decrypt", "encrypt", "assets"]
 publish = false
 
@@ -20,5 +20,5 @@ crate-type = ["cdylib", "rlib"]
 doctest = false
 
 [dependencies]
-rpgm-asset-decrypter-lib = { path = "../.." }
+rpgm-asset-decrypter-lib = { path = ".." }
 wasm-bindgen = "=0.2.129"

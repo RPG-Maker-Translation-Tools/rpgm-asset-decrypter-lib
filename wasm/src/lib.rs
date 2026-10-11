@@ -5,6 +5,7 @@
 //! methods take `&mut [u8]`: `wasm-bindgen` copies the passed `Uint8Array`'s bytes in, runs the call, and copies
 //! the (possibly mutated) bytes back out afterward, so mutations are visible to the caller once the call returns,
 //! same as the reference in-place methods.
+#![warn(clippy::all, clippy::pedantic, clippy::nursery)]
 
 use rpgm_asset_decrypter_lib::{Decrypter as InnerDecrypter, Error as InnerError, FileType as InnerFileType};
 use wasm_bindgen::prelude::*;

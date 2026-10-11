@@ -1,24 +1,24 @@
 [package]
 name = "rpgm-asset-decrypter-lib"
-version = "3.2.4"
-authors = ["savannstm <savannstm@gmail.com>"]
-edition = "2021"
-rust-version = "1.77.0"
-description = "A library for decrypting/encrypting RPG Maker MV/MZ audio and image assets."
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description.workspace = true
 documentation = "https://docs.rs/rpgm-asset-decrypter-lib"
 readme = "README.md"
-repository = "https://github.com/RPG-Maker-Translation-Tools/rpgm-asset-decrypter-lib"
-homepage = "https://crates.io/crates/rpgm-asset-decrypter-lib"
-license = "WTFPL"
+repository.workspace = true
+homepage.workspace = true
+license.workspace = true
 keywords = ["rpgmaker", "assets", "decrypt", "encrypt", "mv"]
 categories = ["encoding", "game-development"]
-exclude = ["/.gitignore", "/.gitattributes", "/rustfmt.toml", "/ts", "/tests"]
+exclude = ["/.gitignore", "/.gitattributes", "/rustfmt.toml", "/tests"]
 
 [workspace]
-members = ["crates/rpgmasd-capi", "crates/rpgmasd-wasm"]
+members = ["capi", "wasm"]
 
 [workspace.package]
-version = "3.2.4"
+version = "4.0.0"
 edition = "2021"
 rust-version = "1.77.0"
 authors = ["savannstm <savannstm@gmail.com>"]

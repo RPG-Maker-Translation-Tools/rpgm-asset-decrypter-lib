@@ -174,3 +174,64 @@ macro_rules! generate_tests {
 generate_tests!(ogg, ogg_cases);
 generate_tests!(m4a, m4a_cases);
 generate_tests!(png, png_cases);
+
+// Regression tests for bugs found by fuzzing (see `fuzz/`).
+mod malformed {
+    use super::*;
+    use rpgm_asset_decrypter_lib::Error;
+
+    // Used to panic in `u8::from_str_radix(..).unwrap()`.
+    #[test]
+    fn non_hex_key_is_rejected() {
+        let mut decrypter = Decrypter::new();
+        assert!(matches!(
+            decrypter.set_key_from_str(&"z".repeat(32)),
+            Err(Error::InvalidKey)
+        ));
+        // `from_str_radix` would have accepted the sign.
+        assert!(matches!(
+            decrypter.set_key_from_str(&"+f".repeat(16)),
+            Err(Error::InvalidKey)
+        ));
+        assert!(decrypter.key().is_none());
+    }
+
+    // Used to panic on slicing past the end of the file.
+    #[test]
+    fn truncated_ogg_is_an_error() {
+        let mut file = RPGM_HEADER.to_vec();
+        for len in 0..400 {
+            file.resize(len.max(RPGM_HEADER.len()), 0);
+            let _ = Decrypter::new().decrypt(&file, FileType::OGG);
+        }
+    }
+
+    // Used to underflow `i - 1` when a box name sat in the first chunk.
+    #[test]
+    fn m4a_box_in_first_chunk() {
+        let mut file = RPGM_HEADER.to_vec();
+        file.extend_from_slice(b"moov");
+        file.resize(80, 0);
+        assert!(Decrypter::new().decrypt(&file, FileType::M4A).is_ok());
+    }
+
+    // The M4A type box size used to live in a `static mut`, so it leaked from one file into the next.
+    #[test]
+    fn m4a_decryption_is_independent_of_earlier_files() {
+        let with_box_at = |chunk: usize| {
+            let mut file = RPGM_HEADER.to_vec();
+            file.resize(80, 0);
+            file[16 + chunk * 4..][..4].copy_from_slice(b"moov");
+            file
+        };
+        let without_box = || {
+            let mut file = RPGM_HEADER.to_vec();
+            file.resize(80, 0);
+            file
+        };
+
+        let alone = Decrypter::new().decrypt(&without_box(), FileType::M4A).unwrap();
+        Decrypter::new().decrypt(&with_box_at(9), FileType::M4A).unwrap();
+        assert_eq!(Decrypter::new().decrypt(&without_box(), FileType::M4A).unwrap(), alone);
+    }
+}
