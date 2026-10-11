@@ -220,6 +220,12 @@ fn main() {
 - `std` - implies `alloc`; additionally enables the `From<&OsStr>` conversion for `FileType`, which needs real `std`.
 - `serde` - enables serde serialization/deserialization for `Error` type.
 
+## NPM
+
+I won't be continuing to publish the WASM bindings ([`rpgmasd-wasm`](./wasm/)) on NPM. NPM has made their 2FA completely unbearable, and I don't want to participate in this logging-in shitshow anymore.
+
+I'm looking for the first person I meet to whom I'll pass the ownership of the package on NPM, if they're willing to maintain it. Until then, you can always build the bindings from source.
+
 ## Support
 
 [Me](https://github.com/savannstm), the maintainer of this project, is a poor college student from Eastern Europe.
