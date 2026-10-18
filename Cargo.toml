@@ -12,15 +12,15 @@ homepage.workspace = true
 license.workspace = true
 keywords = ["rpgmaker", "assets", "decrypt", "encrypt", "mv"]
 categories = ["encoding", "game-development"]
-exclude = ["/.gitignore", "/.gitattributes", "/rustfmt.toml", "/tests"]
+exclude = ["/.gitignore", "/.gitattributes", "/.github", "/rustfmt.toml", "/tests"]
 
 [workspace]
 members = ["capi", "wasm"]
 
 [workspace.package]
-version = "4.0.0"
+version = "5.0.0"
 edition = "2021"
-rust-version = "1.77.0"
+rust-version = "1.81.0"
 authors = ["savannstm <savannstm@gmail.com>"]
 description = "A library for decrypting/encrypting RPG Maker MV/MZ audio and image assets."
 license = "WTFPL"
@@ -37,3 +37,14 @@ serde = ["dep:serde"]
 [dependencies]
 serde = { version = "1.0.229", features = ["derive"], optional = true }
 thiserror = { version = "2.0.21", default-features = false, features = [] }
+
+[dev-dependencies]
+proptest = "1.12.0"
+serde_json = "1.0.154"
+
+# The `no_std` C build needs abort-on-panic, and the panic handler in capi/src/lib.rs aborts anyway.
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"

@@ -1,17 +1,17 @@
 # rpgm-asset-decrypter-lib
 
-**BLAZINGLY** :fire: fast and tiny library for decrypting RPG Maker MV/MZ `rpgmvp`/`png_`, `rpgmvo`/`ogg_`, `rpgmvm`/`m4a_` assets.
+**BLAZINGLY** 🔥 fast and tiny library for decrypting and encrypting RPG Maker MV/MZ `rpgmvp`/`png_`, `rpgmvo`/`ogg_` and `rpgmvm`/`m4a_` assets.
 
-This project essentially is a rewrite of Petschko's [RPG-Maker-MV-Decrypter](https://gitlab.com/Petschko/RPG-Maker-MV-Decrypter) in Rust, but it also implements encryption key extraction from non-image files, such as `rpgmvo`/`ogg_` and `rpgmvm`/`m4a_`, **and** can be used in `no_std` environments.
+A Rust rewrite of Petschko's [RPG-Maker-MV-Decrypter](https://gitlab.com/Petschko/RPG-Maker-MV-Decrypter). Unlike it, this crate also extracts the key from `ogg_` and `m4a_` files and works in `no_std` environments.
 
 And since it's implemented in Rust 🦀🦀🦀, it's also very tiny, clean, and performant.
 
-Used in my [rpgm-asset-decrypter-rs](https://github.com/savannstm/rpgm-asset-decrypter-rs) CLI tool.
+Used in the [rpgm-asset-decrypter-rs](https://github.com/savannstm/rpgm-asset-decrypter-rs) CLI.
 
-This crate has some ports:
+Ports:
 
-- [C API](./capi/) - C bindings, installable via `cargo-c`.
-- [WASM](./wasm/) - WASM bindings generated from Rust code.
+- [C API](https://github.com/RPG-Maker-Translation-Tools/rpgm-asset-decrypter-lib/tree/main/capi) - C bindings, installable via `cargo-c`.
+- [WASM](https://github.com/RPG-Maker-Translation-Tools/rpgm-asset-decrypter-lib/tree/main/wasm) - WebAssembly bindings.
 
 ## Installation
 
@@ -19,9 +19,7 @@ This crate has some ports:
 
 ## Usage
 
-### Decrypting Assets
-
-#### Decrypt with copying
+### Decrypting
 
 ```rust no_run
 use rpgm_asset_decrypter_lib::{Decrypter, FileType};
@@ -30,18 +28,16 @@ use std::fs::{read, write};
 fn main() {
     let mut decrypter = Decrypter::new();
 
-    let encrypted_path = "./image.rpgmvp";
-    let buf = read(encrypted_path).unwrap();
+    let buf = read("./image.rpgmvp").unwrap();
 
-    // Decrypter automatically extracts the RPG Maker encryption key from the file
-    // but you must specify the original asset type.
-    let decrypted = decrypter.decrypt(&buf, FileType::PNG).unwrap();
+    // The key is extracted from the file; the asset type must be given explicitly.
+    let decrypted = decrypter.decrypt(&buf, FileType::Png).unwrap();
 
     write("./image.png", decrypted).unwrap();
 }
 ```
 
-#### Decrypt in place
+To avoid copying, use `decrypt_in_place`, which returns a slice into `buf` starting at offset 16:
 
 ```rust no_run
 use rpgm_asset_decrypter_lib::{Decrypter, FileType};
@@ -50,41 +46,52 @@ use std::fs::{read, write};
 fn main() {
     let mut decrypter = Decrypter::new();
 
-    let encrypted_path = "./image.rpgmvp";
-    let mut buf = read(encrypted_path).unwrap();
+    let mut buf = read("./image.rpgmvp").unwrap();
+    let decrypted = decrypter.decrypt_in_place(&mut buf, FileType::Png).unwrap();
 
-    // decrypt in place; returns a slice into `buf` without reallocating
-    let decrypted_slice = decrypter.decrypt_in_place(&mut buf, FileType::PNG).unwrap();
-
-    write("./image.png", decrypted_slice).unwrap();
+    write("./image.png", decrypted).unwrap();
 }
 ```
 
-#### Deducing `FileType` from extension
+`FileType` can be parsed from an encrypted extension (case-insensitive):
 
 ```rust no_run
-use rpgm_asset_decrypter_lib::{Decrypter, FileType};
-use std::fs::{read, write};
-use std::convert::TryFrom;
+use rpgm_asset_decrypter_lib::FileType;
 
 fn main() {
-    let mut decrypter = Decrypter::new();
-
-    let encrypted_path = "./image.rpgmvp";
-    let mut buf = read(encrypted_path).unwrap();
-
-    // Deduce from &str; &OsStr also works
     let filetype = FileType::try_from("rpgmvp").unwrap();
-
-    let decrypted = decrypter.decrypt_in_place(&mut buf, filetype).unwrap();
-
-    write("./image.png", decrypted).unwrap();
 }
 ```
 
-### Encrypting Assets
+### Reusing a key
 
-#### Encrypt with copying
+`Decrypter::decrypt` derives the key from the first file and reuses it for the following ones, returning `Error::KeyMismatch` if a file was encrypted with another key. Use one `Decrypter` per encryption key.
+
+To decrypt on several threads, set the key once and use the `&self` methods `decrypt_keyed` and `decrypt_in_place_keyed`:
+
+```rust no_run
+use rpgm_asset_decrypter_lib::{Decrypter, FileType, DEFAULT_KEY};
+use std::fs::read;
+
+fn main() {
+    let mut decrypter = Decrypter::new();
+    decrypter.set_key_from_str(DEFAULT_KEY).unwrap();
+
+    std::thread::scope(|scope| {
+        for path in ["./a.rpgmvp", "./b.rpgmvp"] {
+            let decrypter = &decrypter;
+            scope.spawn(move || {
+                let decrypted = decrypter.decrypt_keyed(&read(path).unwrap(), FileType::Png).unwrap();
+                println!("{path}: {} bytes", decrypted.len());
+            });
+        }
+    });
+}
+```
+
+### Encrypting
+
+`encrypt` and `encrypt_in_place` check the data's magic bytes against the given `FileType`, so a wrong type fails with `Error::InvalidContent`. They need a key: set one from the game's `System.json` (`encryptionKey`) or from an existing encrypted file with `set_key_from_file`. `DEFAULT_KEY` works for projects that left the key empty.
 
 ```rust no_run
 use rpgm_asset_decrypter_lib::{Decrypter, FileType, DEFAULT_KEY};
@@ -92,68 +99,38 @@ use std::fs::{read, write};
 
 fn main() {
     let mut decrypter = Decrypter::new();
+    decrypter.set_key_from_str(DEFAULT_KEY).unwrap();
 
-    // You can set a custom key (recommended):
-    //
-    // 1. From an existing encrypted file:
-    // let encrypted = read("./image.rpgmvp").unwrap();
-    // decrypter.set_key_from_file(&encrypted, FileType::PNG);
-    //
-    // 2. Or use the default key (not recommended)
-    decrypter.set_key_from_str(DEFAULT_KEY);
-
-    let png_path = "./picture.png";
-    let buf = read(png_path).unwrap();
-
-    let encrypted = decrypter.encrypt(&buf).unwrap();
+    let buf = read("./image.png").unwrap();
+    let encrypted = decrypter.encrypt(&buf, FileType::Png).unwrap();
 
     write("./image.rpgmvp", encrypted).unwrap();
 }
 ```
 
-#### Encrypt in place
-
-`encrypt_in_place` produces the **raw encrypted payload**, without the RPG Maker header.
-To write a valid `.rpgmvp`, prepend `RPGM_HEADER`.
+`encrypt_in_place` produces only the raw payload, without the header. Prepend `RPGM_HEADER` to get a valid `.rpgmvp`:
 
 ```rust no_run
-use rpgm_asset_decrypter_lib::{Decrypter, DEFAULT_KEY, RPGM_HEADER};
+use rpgm_asset_decrypter_lib::{Decrypter, FileType, DEFAULT_KEY, RPGM_HEADER};
 use std::fs::{read, File};
-use std::io::{Write, IoSlice};
+use std::io::Write;
 
 fn main() {
     let mut decrypter = Decrypter::new();
+    decrypter.set_key_from_str(DEFAULT_KEY).unwrap();
 
-    // You can set a custom key (recommended):
-    //
-    // 1. From an existing encrypted file:
-    // let encrypted = read("./image.rpgmvp").unwrap();
-    // decrypter.set_key_from_file(&encrypted, FileType::PNG);
-    //
-    // 2. Or use the default key (not recommended)
-    decrypter.set_key_from_str(DEFAULT_KEY);
+    let mut buf = read("./image.png").unwrap();
+    decrypter.encrypt_in_place(&mut buf, FileType::Png).unwrap();
 
-    let png_path = "./image.png";
-    let mut buf = read(png_path).unwrap();
-
-    decrypter.encrypt_in_place(&mut buf).unwrap();
-
-    // Write a proper RPG Maker encrypted file
     let mut out = File::create("./image.rpgmvp").unwrap();
-    let segments = [
-        IoSlice::new(RPGM_HEADER),
-        IoSlice::new(&buf),
-    ];
-
-    out.write_vectored(&segments).unwrap();
+    out.write_all(RPGM_HEADER).unwrap();
+    out.write_all(&buf).unwrap();
 }
 ```
 
-### Using convenience wrappers
+### Convenience wrappers
 
-The crate exposes wrapper functions for quick encrypt/decrypt without manually instantiating `Decrypter`.
-
-#### `decrypt` wrapper
+`decrypt`, `decrypt_in_place`, `encrypt` and `encrypt_in_place` do the same as the methods above with a temporary `Decrypter`:
 
 ```rust no_run
 use rpgm_asset_decrypter_lib::{decrypt, FileType};
@@ -161,70 +138,18 @@ use std::fs::{read, write};
 
 fn main() {
     let buf = read("./image.rpgmvp").unwrap();
-    let out = decrypt(&buf, FileType::PNG).unwrap();
-    write("./image.png", out).unwrap();
+    write("./image.png", decrypt(&buf, FileType::Png).unwrap()).unwrap();
 }
 ```
 
-#### `decrypt_in_place` wrapper
-
-```rust no_run
-use rpgm_asset_decrypter_lib::{decrypt_in_place, FileType, HEADER_LENGTH};
-use std::fs::{read, write};
-
-fn main() {
-    let mut buf = read("./image.rpgmvp").unwrap();
-    // decrypt_in_place wrapper doesn't return a slice to the decrypted data, you must slice it manually.
-    decrypt_in_place(&mut buf, FileType::PNG).unwrap();
-    write("./image.png", &buf[HEADER_LENGTH..]).unwrap();
-}
-```
-
-#### `encrypt` wrapper
-
-```rust no_run
-use rpgm_asset_decrypter_lib::{encrypt, DEFAULT_KEY};
-use std::fs::{read, write};
-
-fn main() {
-    let buf = read("./image.png").unwrap();
-    let encrypted = encrypt(&buf, DEFAULT_KEY).unwrap();
-
-    write("./image.rpgmvp", encrypted).unwrap();
-}
-```
-
-#### `encrypt_in_place` wrapper
-
-```rust no_run
-use rpgm_asset_decrypter_lib::{encrypt_in_place, DEFAULT_KEY, RPGM_HEADER};
-use std::fs::{read, File};
-use std::io::{Write, IoSlice};
-
-fn main() {
-    let mut buf = read("./image.png").unwrap();
-
-    // encrypt_in_place does NOT write the header
-    encrypt_in_place(&mut buf, DEFAULT_KEY).unwrap();
-
-    let mut file = File::create("./image.rpgmvp").unwrap();
-    let bufs = [IoSlice::new(RPGM_HEADER), IoSlice::new(&buf)];
-    file.write_vectored(&bufs).unwrap();
-}
-```
+`encrypt` and `encrypt_in_place` take the key as a string, like `DEFAULT_KEY`.
 
 ## Features
 
-- `default` - default feature enables the usage of `std`. If you're using this crate in a `no_std` environment, disable default features.
-- `alloc` - enables the `Vec`-returning `encrypt`/`decrypt` functions (pulled in automatically by `std`). Enable this alone for a `no_std` build that still has a heap; the in-place `encrypt_in_place`/`decrypt_in_place` functions need neither `alloc` nor `std` and are always available.
-- `std` - implies `alloc`; additionally enables the `From<&OsStr>` conversion for `FileType`, which needs real `std`.
-- `serde` - enables serde serialization/deserialization for `Error` type.
-
-## NPM
-
-I won't be continuing to publish the WASM bindings ([`rpgmasd-wasm`](./wasm/)) on NPM. NPM has made their 2FA completely unbearable, and I don't want to participate in this logging-in shitshow anymore.
-
-I'm looking for the first person I meet to whom I'll pass the ownership of the package on NPM, if they're willing to maintain it. Until then, you can always build the bindings from source.
+- `default` - enables `std`. Disable default features for `no_std`.
+- `alloc` - enables the `Vec`-returning `encrypt`/`decrypt` functions (implied by `std`). The in-place functions need neither `alloc` nor `std`.
+- `std` - implies `alloc`; adds the `TryFrom<&OsStr>` conversion for `FileType`.
+- `serde` - serialization for `Error`.
 
 ## Support
 
@@ -239,4 +164,4 @@ Even if you don't, we will still continue working on the project anyways.
 
 ## License
 
-Project is licensed under [WTFPL](https://www.wtfpl.net/).
+Licensed under [WTFPL](https://www.wtfpl.net/).

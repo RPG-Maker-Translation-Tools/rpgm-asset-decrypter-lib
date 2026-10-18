@@ -8,7 +8,7 @@ description.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
-documentation = "https://github.com/RPG-Maker-Translation-Tools/rpgm-asset-decrypter-lib/tree/master/wasm"
+documentation = "https://github.com/RPG-Maker-Translation-Tools/rpgm-asset-decrypter-lib/tree/main/wasm"
 keywords = ["rpgmaker", "wasm", "decrypt", "encrypt", "assets"]
 publish = false
 
@@ -33,3 +33,7 @@ doctest = false
 [dependencies]
 rpgm-asset-decrypter-lib = { path = ".." }
 wasm-bindgen = "0.2.129"
+
+[dev-dependencies]
+js-sys = "0.3.106"
+wasm-bindgen-test = "0.3.79"

@@ -20,7 +20,8 @@ name = "rpgmasd"
 
 [lib]
 name = "rpgmasd"
-crate-type = ["cdylib", "staticlib"]
+# `rlib` is only for the Rust fuzz targets, which depend on this crate; the C artifacts are unchanged.
+crate-type = ["cdylib", "staticlib", "rlib"]
 doctest = false
 
 [features]
@@ -30,3 +31,6 @@ capi = []
 
 [dependencies]
 rpgm-asset-decrypter-lib = { path = "..", default-features = false }
+
+[dev-dependencies]
+proptest = "1.12.0"

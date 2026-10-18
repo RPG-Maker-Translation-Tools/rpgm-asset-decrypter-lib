@@ -7,10 +7,6 @@ edition = "2021"
 [package.metadata]
 cargo-fuzz = true
 
-[dependencies]
-libfuzzer-sys = "0.4"
-rpgm-asset-decrypter-lib = { path = ".." }
-
 [workspace]
 
 [[bin]]
@@ -26,3 +22,15 @@ path = "fuzz_targets/key.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "capi"
+path = "fuzz_targets/capi.rs"
+test = false
+doc = false
+bench = false
+
+[dependencies]
+libfuzzer-sys = "0.4.13"
+rpgm-asset-decrypter-lib = { path = "..", features = ["alloc", "std", "serde"] }
+rpgmasd-capi = { path = "../capi", features = ["std", "capi"] }

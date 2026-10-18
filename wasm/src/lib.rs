@@ -1,14 +1,41 @@
-//! WASM bindings for `rpgm-asset-decrypter-lib`, generated via `wasm-bindgen`.
+//! WASM bindings for `rpgm-asset-decrypter-lib` via `wasm-bindgen`.
 //!
-//! Unlike the archive-decrypter crate's `Decrypter`, this library's `Decrypter` doesn't borrow its input - its
-//! state (the key bytes) is fully owned - so it maps onto a stateful `wasm-bindgen` class directly. The in-place
-//! methods take `&mut [u8]`: `wasm-bindgen` copies the passed `Uint8Array`'s bytes in, runs the call, and copies
-//! the (possibly mutated) bytes back out afterward, so mutations are visible to the caller once the call returns,
-//! same as the reference in-place methods.
+//! No in-place variants: `wasm-bindgen` copies `Uint8Array`s in and out of wasm memory anyway.
+//! Errors are thrown as JS `Error`s whose `name` is the library error variant (see [`error_name`]).
 #![warn(clippy::all, clippy::pedantic, clippy::nursery)]
 
-use rpgm_asset_decrypter_lib::{Decrypter as InnerDecrypter, Error as InnerError, FileType as InnerFileType};
+use rpgm_asset_decrypter_lib::{
+    DEFAULT_KEY, Decrypter as InnerDecrypter, Error as InnerError, FileType as InnerFileType,
+};
 use wasm_bindgen::prelude::*;
+
+#[wasm_bindgen(typescript_custom_section)]
+const ERROR_NAME_TYPE: &str = r#"
+/** The `name` of every `Error` thrown by this package. */
+export type RpgmasdErrorName =
+    | "KeyNotSet"
+    | "InvalidKeyLength"
+    | "InvalidKey"
+    | "InvalidHeader"
+    | "UnexpectedEOF"
+    | "KeyMismatch"
+    | "InvalidContent"
+    | "UnsupportedExtension"
+    | "Unknown";
+"#;
+
+#[wasm_bindgen]
+extern "C" {
+    /// The global JS `Error`, used to set `name` on thrown errors.
+    #[wasm_bindgen(js_name = Error)]
+    type JsErrorObject;
+
+    #[wasm_bindgen(constructor, js_class = "Error")]
+    fn new(message: &str) -> JsErrorObject;
+
+    #[wasm_bindgen(method, setter = name, js_class = "Error")]
+    fn set_name(this: &JsErrorObject, name: &str);
+}
 
 /// The original, decrypted asset kind.
 #[wasm_bindgen]
@@ -22,18 +49,65 @@ pub enum FileType {
 impl From<FileType> for InnerFileType {
     fn from(file_type: FileType) -> Self {
         match file_type {
-            FileType::Png => InnerFileType::PNG,
-            FileType::Ogg => InnerFileType::OGG,
-            FileType::M4a => InnerFileType::M4A,
+            FileType::Png => Self::Png,
+            FileType::Ogg => Self::Ogg,
+            FileType::M4a => Self::M4a,
         }
     }
 }
 
-fn to_js_error(error: InnerError) -> JsError {
-    JsError::new(&error.to_string())
+impl From<InnerFileType> for FileType {
+    fn from(file_type: InnerFileType) -> Self {
+        match file_type {
+            InnerFileType::Png => Self::Png,
+            InnerFileType::Ogg => Self::Ogg,
+            InnerFileType::M4a => Self::M4a,
+            // `FileType` is non-exhaustive; a type this package doesn't know yet would be a bug in the bindings.
+            _ => unreachable!("unsupported file type"),
+        }
+    }
 }
 
-/// A struct responsible for decrypting and encrypting RPG Maker MV/MZ assets.
+/// The `name` of the JS `Error` thrown for each library error.
+#[must_use]
+pub const fn error_name(error: &InnerError) -> &'static str {
+    match error {
+        InnerError::KeyNotSet => "KeyNotSet",
+        InnerError::InvalidKeyLength => "InvalidKeyLength",
+        InnerError::InvalidKey => "InvalidKey",
+        InnerError::InvalidHeader => "InvalidHeader",
+        InnerError::UnexpectedEOF => "UnexpectedEOF",
+        InnerError::KeyMismatch => "KeyMismatch",
+        InnerError::InvalidContent => "InvalidContent",
+        InnerError::UnsupportedExtension => "UnsupportedExtension",
+        _ => "Unknown",
+    }
+}
+
+// Passed to map_err by value.
+#[allow(clippy::needless_pass_by_value)]
+fn to_js_error(error: InnerError) -> JsValue {
+    let object = JsErrorObject::new(&error.to_string());
+    object.set_name(error_name(&error));
+    object.into()
+}
+
+/// Deduces the `FileType` from an encrypted asset's extension (`rpgmvp`, `png_`, ...), ignoring case and a leading dot.
+///
+/// # Errors
+///
+/// Throws if `extension` isn't a known asset extension.
+#[wasm_bindgen(js_name = fileTypeFromExtension)]
+pub fn file_type_from_extension(extension: &str) -> Result<FileType, JsValue> {
+    extension
+        .strip_prefix('.')
+        .unwrap_or(extension)
+        .parse::<InnerFileType>()
+        .map(FileType::from)
+        .map_err(to_js_error)
+}
+
+/// Decrypts and encrypts RPG Maker MV/MZ assets. Call `free()` (or use `using`) to release it early.
 #[wasm_bindgen]
 pub struct Decrypter {
     inner: InnerDecrypter,
@@ -43,56 +117,72 @@ pub struct Decrypter {
 impl Decrypter {
     /// Creates a new `Decrypter` instance.
     #[wasm_bindgen(constructor)]
-    pub fn new() -> Decrypter {
-        Decrypter {
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
             inner: InnerDecrypter::new(),
         }
     }
 
     /// Returns the decrypter's key, or `undefined` if it's not set.
+    #[must_use]
     pub fn key(&self) -> Option<String> {
         self.inner.key().map(str::to_owned)
     }
 
     /// Sets the decrypter's key to the provided hex string.
+    ///
+    /// # Errors
+    ///
+    /// Throws if `key` isn't a valid key string.
     #[wasm_bindgen(js_name = setKeyFromStr)]
-    pub fn set_key_from_str(&mut self, key: &str) -> Result<(), JsError> {
+    pub fn set_key_from_str(&mut self, key: &str) -> Result<(), JsValue> {
         self.inner.set_key_from_str(key).map_err(to_js_error)
     }
 
     /// Sets the key of the decrypter from encrypted `fileContent` data, returning the derived key string.
+    ///
+    /// # Errors
+    ///
+    /// Throws if `file_content` doesn't look like `file_type`, or no key can be derived from it.
     #[wasm_bindgen(js_name = setKeyFromFile)]
-    pub fn set_key_from_file(&mut self, file_content: &[u8], file_type: FileType) -> Result<String, JsError> {
+    pub fn set_key_from_file(&mut self, file_content: &[u8], file_type: FileType) -> Result<String, JsValue> {
         self.inner
             .set_key_from_file(file_content, file_type.into())
             .map(str::to_owned)
             .map_err(to_js_error)
     }
 
-    /// Decrypts RPG Maker file content, returning a decrypted copy. Auto-determines the key from the input file.
-    pub fn decrypt(&mut self, file_content: &[u8], file_type: FileType) -> Result<Vec<u8>, JsError> {
+    /// Decrypts a file, returning a copy. The key is derived from the first file; a file encrypted with another key
+    /// throws `KeyMismatch`, so use one `Decrypter` per encryption key.
+    ///
+    /// # Errors
+    ///
+    /// Throws if `file_content` doesn't look like `file_type`, or it was encrypted with another key.
+    pub fn decrypt(&mut self, file_content: &[u8], file_type: FileType) -> Result<Vec<u8>, JsValue> {
         self.inner.decrypt(file_content, file_type.into()).map_err(to_js_error)
     }
 
-    /// Decrypts RPG Maker file content in place. Auto-determines the key from the input file.
-    #[wasm_bindgen(js_name = decryptInPlace)]
-    pub fn decrypt_in_place(&mut self, file_content: &mut [u8], file_type: FileType) -> Result<(), JsError> {
+    /// Decrypts a file with the key already set, without deriving one. Throws `KeyNotSet` if there is no key.
+    ///
+    /// # Errors
+    ///
+    /// Throws if there is no key, or `file_content` doesn't look like `file_type`.
+    #[wasm_bindgen(js_name = decryptKeyed)]
+    pub fn decrypt_keyed(&self, file_content: &[u8], file_type: FileType) -> Result<Vec<u8>, JsValue> {
         self.inner
-            .decrypt_in_place(file_content, file_type.into())
-            .map_err(to_js_error)?;
-
-        Ok(())
+            .decrypt_keyed(file_content, file_type.into())
+            .map_err(to_js_error)
     }
 
-    /// Encrypts file content, returning an encrypted copy prefixed with the RPG Maker header.
-    pub fn encrypt(&self, file_content: &[u8]) -> Result<Vec<u8>, JsError> {
-        self.inner.encrypt(file_content).map_err(to_js_error)
-    }
-
-    /// Encrypts file content in place. Produces the raw encrypted payload, without the RPG Maker header.
-    #[wasm_bindgen(js_name = encryptInPlace)]
-    pub fn encrypt_in_place(&self, file_content: &mut [u8]) -> Result<(), JsError> {
-        self.inner.encrypt_in_place(file_content).map_err(to_js_error)
+    /// Encrypts a file of `fileType`, returning a copy with the RPG Maker header. Throws `KeyNotSet` without a key,
+    /// and `InvalidContent` or `UnexpectedEOF` if the file doesn't look like `fileType`.
+    ///
+    /// # Errors
+    ///
+    /// Throws if there is no key, or `file_content` doesn't look like `file_type`.
+    pub fn encrypt(&self, file_content: &[u8], file_type: FileType) -> Result<Vec<u8>, JsValue> {
+        self.inner.encrypt(file_content, file_type.into()).map_err(to_js_error)
     }
 }
 
@@ -103,35 +193,28 @@ impl Default for Decrypter {
 }
 
 /// Decrypts RPG Maker file content using a temporary `Decrypter` instance.
+///
+/// # Errors
+///
+/// Throws if `file_content` doesn't look like `file_type`.
 #[wasm_bindgen(js_name = decryptAsset)]
-pub fn decrypt_asset(file_content: &[u8], file_type: FileType) -> Result<Vec<u8>, JsError> {
-    InnerDecrypter::new()
-        .decrypt(file_content, file_type.into())
-        .map_err(to_js_error)
+pub fn decrypt_asset(file_content: &[u8], file_type: FileType) -> Result<Vec<u8>, JsValue> {
+    rpgm_asset_decrypter_lib::decrypt(file_content, file_type.into()).map_err(to_js_error)
 }
 
-/// Decrypts RPG Maker file content in place using a temporary `Decrypter` instance.
-#[wasm_bindgen(js_name = decryptAssetInPlace)]
-pub fn decrypt_asset_in_place(file_content: &mut [u8], file_type: FileType) -> Result<(), JsError> {
-    InnerDecrypter::new()
-        .decrypt_in_place(file_content, file_type.into())
-        .map_err(to_js_error)?;
-
-    Ok(())
-}
-
-/// Encrypts file content using a key string and a temporary `Decrypter` instance.
+/// Encrypts with a key string and a temporary `Decrypter`. The result includes the RPG Maker header.
+///
+/// # Errors
+///
+/// Throws if `key` is invalid, or `file_content` doesn't look like `file_type`.
 #[wasm_bindgen(js_name = encryptAsset)]
-pub fn encrypt_asset(file_content: &[u8], key: &str) -> Result<Vec<u8>, JsError> {
-    let mut decrypter = InnerDecrypter::new();
-    decrypter.set_key_from_str(key).map_err(to_js_error)?;
-    decrypter.encrypt(file_content).map_err(to_js_error)
+pub fn encrypt_asset(file_content: &[u8], file_type: FileType, key: &str) -> Result<Vec<u8>, JsValue> {
+    rpgm_asset_decrypter_lib::encrypt(file_content, file_type.into(), key).map_err(to_js_error)
 }
 
-/// Encrypts file content in place using a key string and a temporary `Decrypter` instance.
-#[wasm_bindgen(js_name = encryptAssetInPlace)]
-pub fn encrypt_asset_in_place(file_content: &mut [u8], key: &str) -> Result<(), JsError> {
-    let mut decrypter = InnerDecrypter::new();
-    decrypter.set_key_from_str(key).map_err(to_js_error)?;
-    decrypter.encrypt_in_place(file_content).map_err(to_js_error)
+/// The key RPG Maker uses when a project's encryption key is empty.
+#[wasm_bindgen(js_name = defaultKey)]
+#[must_use]
+pub fn default_key() -> String {
+    DEFAULT_KEY.to_owned()
 }

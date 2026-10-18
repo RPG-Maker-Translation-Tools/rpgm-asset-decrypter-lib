@@ -1,0 +1,225 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    # Weekly, so the fuzz jobs run for 20 minutes each instead of the 60 seconds of a normal run.
+    - cron: "17 3 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  lint:
+    name: Formatting and clippy
+    timeout-minutes: 20
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+
+  test:
+    name: Test (${{ matrix.os }}, ${{ matrix.package }})
+    timeout-minutes: 45
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025]
+        package: [rpgm-asset-decrypter-lib, rpgmasd-capi]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --no-fail-fast --locked --all-features -p ${{ matrix.package }}
+
+  features:
+    name: Feature builds
+    timeout-minutes: 30
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: no_std
+        run: cargo check --locked --all-targets -p rpgm-asset-decrypter-lib --no-default-features
+      - name: alloc
+        run: cargo check --locked --all-targets -p rpgm-asset-decrypter-lib --no-default-features --features alloc
+      - name: C library without std
+        run: cargo build --locked -p rpgmasd-capi --no-default-features
+
+  msrv:
+    name: MSRV (1.81)
+    timeout-minutes: 30
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@1.81
+      - uses: Swatinem/rust-cache@v2
+      # Libraries only: the dev-dependencies need a newer Cargo than 1.81 to even be parsed.
+      - run: cargo check --locked -p rpgm-asset-decrypter-lib -p rpgmasd-capi --lib --all-features
+      - run: cargo check --locked -p rpgmasd-capi --lib --no-default-features
+
+  miri:
+    name: Miri
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      # Fixture tests read files from the source tree, which Miri's isolation forbids.
+      MIRIFLAGS: -Zmiri-disable-isolation
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: miri
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo miri setup
+      - run: cargo miri test --no-fail-fast --locked --tests --all-features -p rpgm-asset-decrypter-lib -p rpgmasd-capi
+
+  asan:
+    name: AddressSanitizer
+    timeout-minutes: 60
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rust-src
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cbindgen
+      - run: sudo apt-get update && sudo apt-get install -y clang
+      # cargo-fuzz defaults to the musl target, where the sanitizer can't link; the test runs use the gnu target too.
+      - name: Test under AddressSanitizer
+        env:
+          RUSTFLAGS: -Zsanitizer=address
+          # `-Zbuild-std` rebuilds std under the dev profile, which is `panic = "abort"`, and the test harness needs unwinding.
+          CARGO_PROFILE_DEV_PANIC: unwind
+        run: cargo test --no-fail-fast -Zbuild-std --locked --target x86_64-unknown-linux-gnu --tests --all-features -p rpgm-asset-decrypter-lib -p rpgmasd-capi
+      - name: C test under AddressSanitizer
+        env:
+          RUSTFLAGS: -Zsanitizer=address
+        run: |
+          cargo build -Zbuild-std --locked --target x86_64-unknown-linux-gnu --all-features -p rpgmasd-capi
+          cbindgen --config capi/cbindgen.toml --crate rpgmasd-capi --output target/capi/rpgmasd.h
+          clang -std=c11 -Wall -Wextra -Werror -fsanitize=address -Itarget/capi capi/tests/c_api.c target/x86_64-unknown-linux-gnu/debug/librpgmasd.a -lpthread -ldl -lm -o target/capi/c_api_asan
+          target/capi/c_api_asan
+
+  c-api:
+    name: C API test
+    timeout-minutes: 30
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cbindgen
+      - run: cargo build --locked -p rpgmasd-capi --all-features
+      - run: cbindgen --config capi/cbindgen.toml --crate rpgmasd-capi --output target/capi/rpgmasd.h
+      - run: cc -std=c11 -Wall -Wextra -Werror -Itarget/capi capi/tests/c_api.c target/debug/librpgmasd.a -lpthread -ldl -lm -o target/capi/c_api
+      - run: target/capi/c_api
+
+  wasm:
+    name: WASM tests
+    timeout-minutes: 30
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack
+      - run: cargo clippy --locked -p rpgmasd-wasm --target wasm32-unknown-unknown --all-targets --all-features -- -D warnings
+      # wasm-pack exits 0 even when no test runs, so require at least one passing test.
+      - name: Node.js tests
+        shell: bash
+        run: |
+          wasm-pack test --node wasm --all-features 2>&1 | tee node.log
+          grep -Eq 'test result: ok\. [1-9][0-9]* passed' node.log
+      - name: Chrome tests
+        shell: bash
+        run: |
+          wasm-pack test --headless --chrome wasm --all-features 2>&1 | tee chrome.log
+          grep -Eq 'test result: ok\. [1-9][0-9]* passed' chrome.log
+
+  fuzz:
+    name: Fuzz (${{ matrix.target }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [decrypt, key, capi]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: fuzz
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-fuzz
+      # The corpus is not committed; each run continues from the previous run's corpus.
+      - uses: actions/cache@v6
+        with:
+          path: fuzz/corpus/${{ matrix.target }}
+          key: fuzz-corpus-${{ matrix.target }}-${{ github.run_id }}
+          restore-keys: fuzz-corpus-${{ matrix.target }}-
+      - name: Check the fuzz lockfile
+        working-directory: fuzz
+        run: cargo fetch --locked
+      - name: Seeds
+        working-directory: fuzz
+        run: cargo run --locked --example make_seeds
+      # Pull requests get a 60-second smoke run; the weekly schedule fuzzes for 20 minutes per target.
+      - name: Fuzz
+        working-directory: fuzz
+        # cargo-fuzz defaults to the musl target, where the sanitizer can't link.
+        run: cargo fuzz run --target x86_64-unknown-linux-gnu ${{ matrix.target }} -- -max_total_time=${{ github.event_name == 'schedule' && 1200 || 60 }}
+      - name: Keep crashing inputs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fuzz-artifacts-${{ matrix.target }}
+          path: fuzz/artifacts/${{ matrix.target }}
+          if-no-files-found: ignore
