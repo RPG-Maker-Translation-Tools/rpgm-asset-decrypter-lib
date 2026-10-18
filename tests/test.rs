@@ -802,7 +802,8 @@ mod validation {
         );
     }
 
-    #[cfg(unix)]
+    // `TryFrom<&OsStr>` exists only with the `std` feature, so this test is skipped in `no_std` and `alloc` builds.
+    #[cfg(all(unix, feature = "std"))]
     #[test]
     fn non_utf8_extension_is_unsupported() {
         use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
